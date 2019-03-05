@@ -93,25 +93,25 @@ void BOARD_InitBootClocks(void)
 name: BOARD_BootClockRUN
 called_from_default_init: true
 outputs:
-- {id: Bus_clock.outFreq, value: 40 MHz}
-- {id: Core_clock.outFreq, value: 80 MHz}
-- {id: Flash_clock.outFreq, value: 20 MHz}
-- {id: FlexBus_clock.outFreq, value: 80/3 MHz}
+- {id: Bus_clock.outFreq, value: 36 MHz}
+- {id: Core_clock.outFreq, value: 72 MHz, locked: true, accuracy: '0.001'}
+- {id: Flash_clock.outFreq, value: 18 MHz}
+- {id: FlexBus_clock.outFreq, value: 24 MHz}
 - {id: LPO_clock.outFreq, value: 1 kHz}
 - {id: MCGFFCLK.outFreq, value: 250 kHz}
 - {id: MCGIRCLK.outFreq, value: 32.768 kHz}
 - {id: OSCERCLK.outFreq, value: 8 MHz}
 - {id: OSCERCLK_UNDIV.outFreq, value: 8 MHz}
-- {id: PLLFLLCLK.outFreq, value: 80 MHz}
-- {id: System_clock.outFreq, value: 80 MHz}
+- {id: PLLFLLCLK.outFreq, value: 72 MHz}
+- {id: System_clock.outFreq, value: 72 MHz}
 settings:
 - {id: MCGMode, value: PEE}
 - {id: MCG.FCRDIV.scale, value: '1', locked: true}
 - {id: MCG.FRDIV.scale, value: '32'}
 - {id: MCG.IREFS.sel, value: MCG.FRDIV}
 - {id: MCG.PLLS.sel, value: MCG.PLL}
-- {id: MCG.PRDIV.scale, value: '4', locked: true}
-- {id: MCG.VDIV.scale, value: '40', locked: true}
+- {id: MCG.PRDIV.scale, value: '3'}
+- {id: MCG.VDIV.scale, value: '27'}
 - {id: MCG_C1_IRCLKEN_CFG, value: Enabled}
 - {id: MCG_C2_OSC_MODE_CFG, value: ModeOscLowPower}
 - {id: MCG_C2_RANGE0_CFG, value: Very_high}
@@ -147,8 +147,8 @@ const mcg_config_t mcgConfig_BOARD_BootClockRUN =
         .pll0Config =
             {
                 .enableMode = MCG_PLL_DISABLE,    /* MCGPLLCLK disabled */
-                .prdiv = 0x3U,                    /* PLL Reference divider: divided by 4 */
-                .vdiv = 0x10U,                    /* VCO divider: multiplied by 40 */
+                .prdiv = 0x2U,                    /* PLL Reference divider: divided by 3 */
+                .vdiv = 0x3U,                     /* VCO divider: multiplied by 27 */
             },
     };
 const sim_clock_config_t simConfig_BOARD_BootClockRUN =

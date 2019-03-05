@@ -6,32 +6,28 @@ Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can b
 Next use userData to pass the structure
 
 ## Add Second UART 0.2
+-	Added a structure `stTransferUart` to organize variables of transfer-Uart method 
+-	UART1 is Debug 115200-n-8-1 and UART0 is 9600-n-8-1
+- Increase TX_BUFFER_LENGTH to 128, asserts also are routed here
+
 Use UART0, pins are accesible at the Arduino connector [PTA1-RX-D9](Arduino J2 Connector) and [PTA2-TX-D3](Arduino J1 Connector)
+
 Add the SDK component for Uart0 `Open MCUXpresso Configuration` button and add pins
-In the `Peripherals` tools add UART0 component and configure for
+In the `Peripherals` tools add UART0 component and configure for:
 - Name: UART_AUX
 - Mode:	Transfer
 - Peripheral:	UART0
-- UART configuration leaave the defaults 115200,N,8,1 for this commit
+- UART configuration leave the defaults 115200,N,8,1 for this commit
 	+ SYS_CLK 80MHz, 
 	+ Clock Freq CLOCK_GetFreq()  
 	+ 115200, TX water 0, RX water 1, Idle after valid start bit
 	+ Enable TX
 	+ Enable RX
-- Leave the Transfer configuraton as default (these are const data that we won;t be able to modify anyway)
+- Leave the Transfer configuraton as default (these are const data that we won't be able to modify anyway)
 	+ Transfer handle ID:	UART_AUX_handle
 	+ Check init 
 
 - Update the project code and the peripheral.* files should be created and pin_mux.* and clock.* should be updated 
-
-
-
-
-
-
-
-
-
 
 
 ## Base project 0.1 
