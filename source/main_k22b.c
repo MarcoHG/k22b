@@ -14,50 +14,73 @@
 #define TX_BUFFER_LENGTH 50
 #define RX_BUFFER_LENGTH 128
 
+typedef struct	_stTransferUart
+{
+	uart_handle_t 	handle;
+	uart_config_t 	config;
+	UART_Type 			*base;
+
+	// Receiver
+	uint8_t 				rxByte;
+	uint8_t 				rxRingBuffer[RX_BUFFER_LENGTH];
+	uint16_t				rxTail;
+	uint16_t				rxHead;
+	uart_transfer_t rxTransfer;
+
+	// Transmitter
+	uint8_t 				txBuffer[TX_BUFFER_LENGTH];
+	uart_transfer_t txTransfer;
+
+	// Status
+	volatile bool 	txOnGoing;
+	volatile bool 	rxFlag;
+
+} stTransferUart;
 
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
 
 /* UART user callback */
-void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status, void *userData);
-void prepareRxDbgCharacter(void);
+void UART_DebugCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+    void *userData);
+void UART_AuxCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+    void *userData);
+bool getRxRingBuffer(stTransferUart *psUart, uint8_t *data);
 int __sys_write(int iFileHandle, char *pcBuffer, int iLength);
 int __sys_readc(void);
+
+
+
 
 /*******************************************************************************
  * Variables
  ******************************************************************************/
-uart_handle_t g_uartDbgHandle;
-uint8_t g_txDbgBuffer[TX_BUFFER_LENGTH] = {0};
-uint8_t g_rxDbgByte = 0;
-uint8_t g_rxDbgRingBuffer[RX_BUFFER_LENGTH] = {0};
-uint16_t	rxDbgTail =0;
-uint16_t	rxDbgHead =0;
-
-volatile bool txDbgOnGoing = false;
-volatile bool rxDbgFlag = false;
+stTransferUart sDbgUartTransfer;
+stTransferUart sAuxUartTransfer;
 
 /*******************************************************************************
  * Code
  ******************************************************************************/
-/* UART user callback */
-void UART_UserCallback(UART_Type *base, uart_handle_t *handle, status_t status, void *userData)
+/* Debug UART user callback */
+void UART_DebugCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+		void *userData)
 {
-    userData = userData;
+	// userData = userData;	// ?
+	stTransferUart *psUart = (stTransferUart *)userData;	//
 
-    if (kStatus_UART_TxIdle == status)
-    {
-        txDbgOnGoing = false;
-    }
+	if (kStatus_UART_TxIdle == status)
+	{
+		psUart->txOnGoing = false;
+	}
 
-    if (kStatus_UART_RxIdle == status)
-    {
-        rxDbgFlag = true;
-        g_rxDbgRingBuffer[rxDbgHead++] = g_rxDbgByte;
-        rxDbgHead %= RX_BUFFER_LENGTH;
-        prepareRxDbgCharacter();
-    }
+	if (kStatus_UART_RxIdle == status)
+	{
+		psUart->rxFlag = true;
+		psUart->rxRingBuffer[psUart->rxHead++] = psUart->rxByte;
+		psUart->rxHead %= RX_BUFFER_LENGTH;
+		UART_TransferReceiveNonBlocking(base, handle, &psUart->rxTransfer,NULL);
+	}
 }
 
 // Primitive to re-target printf
@@ -65,43 +88,103 @@ int __sys_write(int iFileHandle, char *pcBuffer, int iLength)
 {
 	// Assume we have enough buffer size
 	assert(iLength < TX_BUFFER_LENGTH);	/// add assert later
-	static uart_transfer_t sendXfer;
-	sendXfer.data 		=	g_txDbgBuffer;
-	sendXfer.dataSize = iLength;
-	memcpy(g_txDbgBuffer, pcBuffer, iLength);
-	txDbgOnGoing = true;
-	UART_TransferSendNonBlocking(DEMO_UART, &g_uartDbgHandle, &sendXfer);
+
+	sDbgUartTransfer.txTransfer.data 			= sDbgUartTransfer.txBuffer;
+	sDbgUartTransfer.txTransfer.dataSize 	= iLength;
+
+	memcpy(sDbgUartTransfer.txBuffer, pcBuffer, iLength);
+	sDbgUartTransfer.txOnGoing = true;
+	UART_TransferSendNonBlocking(sDbgUartTransfer.base, &sDbgUartTransfer.handle,
+	    &sDbgUartTransfer.txTransfer);
 	return 0;	// printf is a streamed output - assume everything was sent to tx buffer
 }
 int __sys_readc(void)
 {
-	if( rxDbgHead == rxDbgTail )
+	if( sDbgUartTransfer.rxHead == sDbgUartTransfer.rxTail )
 		return EOF;
-	int data = g_rxDbgRingBuffer[rxDbgTail++];
-	rxDbgTail %= RX_BUFFER_LENGTH;
+	int data = sDbgUartTransfer.rxRingBuffer[sDbgUartTransfer.rxTail++];
+	sDbgUartTransfer.rxTail %= RX_BUFFER_LENGTH;
 
 	return data;
 }
 
-void prepareRxDbgCharacter(void)
-{
-	static uart_transfer_t receiveXfer;
-	receiveXfer.data 			= &g_rxDbgByte;
-	receiveXfer.dataSize 	= 1;	// Get notifications every char
-	UART_TransferReceiveNonBlocking(DEMO_UART, &g_uartDbgHandle, &receiveXfer, NULL);
 
-}
-
-bool	getRxDbg(uint8_t *data)
+/*!
+ * Poll the receive ring buffer for a new character and return in parameter
+ *
+ */
+bool	getRxRingBuffer(stTransferUart *psUart, uint8_t *data)
 {
-	if( rxDbgTail	!= rxDbgHead )
+	if( psUart->rxTail	!= psUart->rxHead )
 	{
-		*data = g_rxDbgRingBuffer[rxDbgTail++];
-		rxDbgTail %= RX_BUFFER_LENGTH;
+		*data = psUart->rxRingBuffer[psUart->rxTail++];
+		psUart->rxTail %= RX_BUFFER_LENGTH;
 		return true;
 	}
 	else
 		return false;
+}
+
+void initTransferUart(stTransferUart *psUart, UART_Type *base,
+    uart_transfer_callback_t callback, clock_name_t clock)
+{
+	// Initialize bss
+	psUart->txBuffer[0] = 0;
+	psUart->rxRingBuffer[0] = 0;
+	psUart->rxHead = 0;
+	psUart->rxTail = 0;
+	psUart->rxByte = 0;
+	psUart->txOnGoing = false;
+	psUart->rxFlag = false;
+
+	/*
+	 * config.baudRate_Bps = 115200U;
+	 * config.parityMode = kUART_ParityDisabled;
+	 * config.stopBitCount = kUART_OneStopBit;
+	 * config.txFifoWatermark = 0;
+	 * config.rxFifoWatermark = 1;
+	 * config.enableTx = false;
+	 * config.enableRx = false;
+	 */
+	uart_config_t *pConfig = &psUart->config;
+	UART_GetDefaultConfig(pConfig);
+	pConfig->baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
+	pConfig->enableTx = true;
+	pConfig->enableRx = true;
+
+	psUart->base = base;
+	UART_Init(psUart->base, pConfig, CLOCK_GetFreq(clock));
+
+	UART_TransferCreateHandle(base, &psUart->handle, callback, psUart);
+
+	// Prepare to receive ONE character
+	psUart->rxTransfer.data = &psUart->rxByte;
+	psUart->rxTransfer.dataSize = 1;
+
+	UART_TransferReceiveNonBlocking(psUart->base, &psUart->handle,
+	    &psUart->rxTransfer, NULL);
+
+}
+
+/* Auxiliary UART user callback */
+void UART_AuxCallback(UART_Type *base, uart_handle_t *handle, status_t status,
+		void *userData)
+{
+	// userData = userData;	// ?
+	stTransferUart *psUart = (stTransferUart *)userData;	//
+
+	if (kStatus_UART_TxIdle == status)
+	{
+		psUart->txOnGoing = false;
+	}
+
+	if (kStatus_UART_RxIdle == status)
+	{
+		psUart->rxFlag = true;
+		psUart->rxRingBuffer[psUart->rxHead++] = psUart->rxByte;
+		psUart->rxHead %= RX_BUFFER_LENGTH;
+		UART_TransferReceiveNonBlocking(base, handle, &psUart->rxTransfer,NULL);
+	}
 }
 
 /*!
@@ -109,41 +192,35 @@ bool	getRxDbg(uint8_t *data)
  */
 int main(void)
 {
-    uart_config_t config;
-    // uart_transfer_t xfer;
-
 
     BOARD_InitPins();
     BOARD_BootClockRUN();
 
-    /*
-     * config.baudRate_Bps = 115200U;
-     * config.parityMode = kUART_ParityDisabled;
-     * config.stopBitCount = kUART_OneStopBit;
-     * config.txFifoWatermark = 0;
-     * config.rxFifoWatermark = 1;
-     * config.enableTx = false;
-     * config.enableRx = false;
-     */
-    UART_GetDefaultConfig(&config);
-    config.baudRate_Bps = BOARD_DEBUG_UART_BAUDRATE;
-    config.enableTx = true;
-    config.enableRx = true;
+    // UART1 is used for Debug
+    initTransferUart(&sDbgUartTransfer, UART1, UART_DebugCallback, SYS_CLK);
 
-    UART_Init(DEMO_UART, &config, DEMO_UART_CLK_FREQ);
-    UART_TransferCreateHandle(DEMO_UART, &g_uartDbgHandle, UART_UserCallback, NULL);
 
-    //	dataSize will be set at printf
 
-    // Prepare to receive one
-    prepareRxDbgCharacter();
-
-    printf("God is good ");
+    printf("Maranatha! ");	// Test retarget at UART1
     uint8_t ch;
     int nbrRec=0, nbrRecCpy=0;
+
+    // UART0 Auxiliary
+    initTransferUart(&sAuxUartTransfer, UART0, UART_AuxCallback, SYS_CLK);
+
+    uint8_t msg[] = "Hello from Auxiliary Uart\n";
+    sAuxUartTransfer.txTransfer.data 			= sAuxUartTransfer.txBuffer;
+    sAuxUartTransfer.txTransfer.dataSize 	= sizeof(msg)-1;
+    memcpy(sAuxUartTransfer.txBuffer, msg, sizeof(msg)-1);
+    sAuxUartTransfer.txOnGoing 	= true;
+    UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
+	    &sAuxUartTransfer.txTransfer);
+
+
+
     while (1)
     {
-    	while(getRxDbg(&ch))
+    	while(getRxRingBuffer(&sDbgUartTransfer, &ch))
     		++nbrRec;
     	if(nbrRec != nbrRecCpy)
     	{
@@ -152,7 +229,10 @@ int main(void)
     	}
 
     	// Simulate a long delay
-    	for(uint16_t i=0; i < 65000U; ++i);
+    	for(uint16_t i=0; i < 65000U; ++i)
+    	{
+    		// Debug
+    	}
 
     }
 }
