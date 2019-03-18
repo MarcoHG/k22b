@@ -4,6 +4,9 @@
 #include "pin_mux.h"
 #include "clock_config.h"
 #include <stdio.h>
+#include <stdlib.h>	//strtol
+
+#include <string.h>
 /*******************************************************************************
  * Definitions
  ******************************************************************************/
@@ -50,6 +53,8 @@ int __sys_write(int iFileHandle, char *pcBuffer, int iLength);
 int __sys_readc(void);
 void initUarts(void);
 
+bool  buildStdInArg(uint8_t ch, uint8_t *str);
+void 	parseAndSendHex(char *cmd);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -194,6 +199,68 @@ void UART_AuxCallback(UART_Type *base, uart_handle_t *handle, status_t status,
 
 
 /*!
+ * 	\brief parses the c-string for hex codes and send them to serial port
+ *
+ * 	Assign
+ * 	a =  b
+ * 	hex1 hex2
+ *
+ *
+ * 	returns a c-string is being built and return true when user hits \r or \n
+ */
+void parseAndSendHex(char *cmd)
+{
+	static uint8_t sendArray[20], index;
+
+	char *pToken = strtok(cmd, " ");
+	index =0;
+	while (pToken != NULL)
+	{
+		int32_t data = strtol(pToken, NULL, 16);
+		if(data <= 255)
+			sAuxUartTransfer.txBuffer[index++] = data;
+		pToken = strtok (NULL, " ,.-");
+	}
+	if(index)
+	{
+		sAuxUartTransfer.txTransfer.dataSize = index;
+		sAuxUartTransfer.txOnGoing = true;
+		UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
+		    &sAuxUartTransfer.txTransfer);
+	}
+	cmd[0]=0;
+}
+/*!
+ * 	buildStdInArg
+ * 	Build the string in the indicated pointer, user makes sure it has enough memory
+ *
+ * 	returns a c-string is being built and return true when user hits \r or \n
+ */
+bool  buildStdInArg(uint8_t ch, uint8_t *str)
+{
+	int i = strlen((char *)str);
+	if('\r' == ch  || '\n' == ch)
+	{
+		parseAndSendHex((char *)str);
+		str[0] = 0;
+	}
+	else
+		if(0x08 == ch && i > 0)
+		{
+			printf("%c %c",ch,ch);
+			str[--i] = 0;
+		}
+		else
+		{
+			str[i++] = ch;
+			str[i] =0;	// c-string
+			putchar(ch);
+		}
+	return false;
+
+}
+
+/*!
  * @brief Main function
  */
 int main(void)
@@ -234,7 +301,7 @@ int main(void)
 	initTransferUart(&sAuxUartTransfer, UART0, UART_DebugCallback, UART0_CLK_SRC);
 
 
-	printf("Debug UART - count rx chars, displays every 10\r");// Test retarget at UART1
+	printf("Debug UART - Input hex commands and 'enter' to send it to auxport\r");// Test retarget at UART1
 	uint8_t ch, cha;
 	uint16_t nbrRec = 0, nbrRecCpy = 0;
 
@@ -249,11 +316,18 @@ int main(void)
 	UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
 	    &sAuxUartTransfer.txTransfer);
 
+
+	uint8_t	command[10] = {0}, cmd_index=0;
+
 	while (1)
 	{
 		// Handle Debug Console
-		while (getRxRingBuffer(&sDbgUartTransfer, &ch))
-			++nbrRec;
+		if(getRxRingBuffer(&sDbgUartTransfer, &ch))
+			if (buildStdInArg(ch, command) )
+			{
+				//parseCommand(str);
+			}
+
 		if (nbrRec != nbrRecCpy)
 		{
 			if(!(nbrRec %10))
@@ -263,14 +337,14 @@ int main(void)
 		// Handle Aux
 		if(getRxRingBuffer(&sAuxUartTransfer, &cha))
 		{
-			sAuxUartTransfer.txTransfer.data[0] 	= cha;
-			sAuxUartTransfer.txTransfer.dataSize 	= 1;
-			UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
-				    &sAuxUartTransfer.txTransfer);
+			printf("[%x]",0xFF&cha);
+			//sAuxUartTransfer.txTransfer.data[0] 	= cha;
+			//sAuxUartTransfer.txTransfer.dataSize 	= 1;
+			//UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle, &sAuxUartTransfer.txTransfer);
 		}
 
 		// Simulate a long delay
-		for (uint16_t i = 0; i < 65000U; ++i)
+		//for (uint16_t i = 0; i < 65000U; ++i)
 		{
 			// Debug
 		}
