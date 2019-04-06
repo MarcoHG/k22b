@@ -6,9 +6,49 @@
 #ifndef _PERIPHERALS_H_
 #define _PERIPHERALS_H_
 
+/***********************************************************************************************************************
+ * Included files
+ **********************************************************************************************************************/
+#include "fsl_common.h"
+#include "fsl_clock.h"
+#include "fsl_ftm.h"
+#include "fsl_pit.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif /* __cplusplus */
+
+/***********************************************************************************************************************
+ * Definitions
+ **********************************************************************************************************************/
+/* Definitions for BOARD_InitPeripherals functional group */
+/* Definition of peripheral ID */
+#define QUAD1_PERIPHERAL FTM1
+/* Definition of the clock source frequency */
+#define QUAD1_CLOCK_SOURCE CLOCK_GetFreq(kCLOCK_BusClk)
+/* QUAD1 interrupt vector ID (number). */
+#define QUAD1_IRQN FTM2_IRQn
+/* QUAD1 interrupt handler identifier. */
+#define QUAD1_IRQHANDLER FTM2_IRQHandler
+/* BOARD_InitPeripherals defines for PIT */
+/* Definition of peripheral ID. */
+#define PIT1_PERIPHERAL PIT
+/* Definition of clock source. */
+#define PIT1_CLOCK_SOURCE kCLOCK_BusClk
+/* Definition of clock source frequency. */
+#define PIT1_CLK_FREQ CLOCK_GetFreq(PIT1_CLOCK_SOURCE)
+/* Definition of ticks count for channel 0. */
+#define PIT1_0_TICKS USEC_TO_COUNT(5000U, PIT1_CLK_FREQ) - 1U
+/* PIT1 interrupt vector ID (number). */
+#define PIT1_0_IRQN PIT0_IRQn
+/* PIT1 interrupt handler identifier. */
+#define PIT1_0_IRQHANDLER PIT0_IRQHandler
+
+/***********************************************************************************************************************
+ * Global variables
+ **********************************************************************************************************************/
+extern const ftm_config_t QUAD1_config;
+extern const pit_config_t PIT1_config;
 
 /***********************************************************************************************************************
  * Initialization functions

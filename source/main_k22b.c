@@ -1,5 +1,8 @@
 #include "board.h"
 #include "fsl_uart.h"
+#include "fsl_ftm.h" // FTM_GetQuadDecoderCounterValue
+#include "peripherals.h"
+
 
 #include "pin_mux.h"
 #include "clock_config.h"
@@ -61,9 +64,28 @@ void 	parseAndSendHex(char *cmd);
 stTransferUart sDbgUartTransfer;
 stTransferUart sAuxUartTransfer;
 
+volatile bool pitIsrFlag = false;
+volatile uint32_t encoder_count = 0U;
+
 /*******************************************************************************
  * Code
  ******************************************************************************/
+/* PIT IRQ */
+void PIT1_0_IRQHANDLER (void )
+{
+	/* Clear interrupt flag.*/
+	    PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
+	    pitIsrFlag = true;
+
+
+
+	    /* Add for ARM errata 838869, affects Cortex-M4, Cortex-M4F Store immediate overlapping
+	  exception return operation might vector to incorrect interrupt */
+	#if defined __CORTEX_M && (__CORTEX_M == 4U)
+	    __DSB();
+	#endif
+}
+
 /* Debug UART user callback */
 void UART_DebugCallback(UART_Type *base, uart_handle_t *handle, status_t status,
     void *userData)
@@ -319,14 +341,25 @@ int main(void)
 
 	uint8_t	command[10] = {0}, cmd_index=0;
 
+	// Initialize PIT & Quad Decoder
+	BOARD_InitPeripherals();
+
+	uint32_t counts;
+
 	while (1)
 	{
 		// Handle Debug Console
 		if(getRxRingBuffer(&sDbgUartTransfer, &ch))
-			if (buildStdInArg(ch, command) )
-			{
-				//parseCommand(str);
-			}
+		if(ch == 'e')
+		{
+			counts = FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);	// encoder_count = FTM_GetQuadDecoderCounterValue(DEMO_FTM_BASEADDR);
+			printf("E: %d\r\n", counts);
+		}
+		else
+		if (buildStdInArg(ch, command) )
+		{
+			//parseCommand(str);
+		}
 
 		if (nbrRec != nbrRecCpy)
 		{
@@ -341,6 +374,12 @@ int main(void)
 			//sAuxUartTransfer.txTransfer.data[0] 	= cha;
 			//sAuxUartTransfer.txTransfer.dataSize 	= 1;
 			//UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle, &sAuxUartTransfer.txTransfer);
+		}
+
+		if(pitIsrFlag)	// Every 5 mS
+		{
+			pitIsrFlag = false;
+
 		}
 
 		// Simulate a long delay

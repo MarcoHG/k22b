@@ -42,6 +42,8 @@ BOARD_InitPins:
   - {pin_num: '2', peripheral: UART1, signal: RX, pin_signal: ADC1_SE5a/PTE1/LLWU_P0/SPI1_SOUT/UART1_RX/I2C1_SCL/SPI1_SIN}
   - {pin_num: '23', peripheral: UART0, signal: RX, pin_signal: PTA1/UART0_RX/FTM0_CH6/JTAG_TDI/EZP_DI}
   - {pin_num: '24', peripheral: UART0, signal: TX, pin_signal: PTA2/UART0_TX/FTM0_CH7/JTAG_TDO/TRACE_SWO/EZP_DO}
+  - {pin_num: '35', peripheral: FTM1, signal: 'QD_PH, A', pin_signal: ADC0_SE8/ADC1_SE8/PTB0/LLWU_P5/I2C0_SCL/FTM1_CH0/FTM1_QD_PHA}
+  - {pin_num: '36', peripheral: FTM1, signal: 'QD_PH, B', pin_signal: ADC0_SE9/ADC1_SE9/PTB1/I2C0_SDA/FTM1_CH1/FTM1_QD_PHB}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -56,6 +58,8 @@ void BOARD_InitPins(void)
 {
     /* Port A Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortA);
+    /* Port B Clock Gate Control: Clock enabled */
+    CLOCK_EnableClock(kCLOCK_PortB);
     /* Port E Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortE);
 
@@ -64,6 +68,12 @@ void BOARD_InitPins(void)
 
     /* PORTA2 (pin 24) is configured as UART0_TX */
     PORT_SetPinMux(BOARD_INITPINS_LEDRGB_GREEN_PORT, BOARD_INITPINS_LEDRGB_GREEN_PIN, kPORT_MuxAlt2);
+
+    /* PORTB0 (pin 35) is configured as FTM1_QD_PHA */
+    PORT_SetPinMux(PORTB, 0U, kPORT_MuxAlt6);
+
+    /* PORTB1 (pin 36) is configured as FTM1_QD_PHB */
+    PORT_SetPinMux(PORTB, 1U, kPORT_MuxAlt6);
 
     /* PORTE0 (pin 1) is configured as UART1_TX */
     PORT_SetPinMux(PORTE, 0U, kPORT_MuxAlt3);

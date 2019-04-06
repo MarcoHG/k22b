@@ -32,10 +32,144 @@ component:
 #include "peripherals.h"
 
 /***********************************************************************************************************************
+ * BOARD_InitPeripherals functional group
+ **********************************************************************************************************************/
+/***********************************************************************************************************************
+ * QUAD1 initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'QUAD1'
+- type: 'ftm'
+- mode: 'QuadratureDecoder'
+- type_id: 'ftm_04a15ae4af2b404bf2ae403c3dbe98b3'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'FTM1'
+- config_sets:
+  - ftm_main_config:
+    - ftm_config:
+      - prescale: 'kFTM_Prescale_Divide_1'
+      - bdmMode: 'kFTM_BdmMode_0'
+      - pwmSyncMode: 'kFTM_SoftwareTrigger'
+      - reloadPoints: ''
+      - faultMode: 'kFTM_Fault_Disable'
+      - faultFilterValue: '0'
+      - deadTimePrescale: 'kFTM_Deadtime_Prescale_1'
+      - deadTimeValue: '0'
+      - extTriggers: ''
+      - chnlInitState: ''
+      - chnlPolarity: ''
+      - useGlobalTimeBase: 'false'
+    - timer_interrupts: ''
+    - enable_irq: 'false'
+    - ftm_interrupt:
+      - IRQn: 'FTM2_IRQn'
+      - enable_priority: 'false'
+      - enable_custom_name: 'false'
+    - EnableTimerInInit: 'true'
+    - quick_selection: 'QuickSelectionDefault'
+  - ftm_quadrature_decoder_mode:
+    - timerModuloVal: '5000'
+    - timerInitVal: '0'
+    - ftm_quad_decoder_mode: 'kFTM_QuadPhaseEncode'
+    - ftm_phase_a_params:
+      - enablePhaseFilter: 'false'
+      - phasePolarity: 'kFTM_QuadPhaseNormal'
+    - ftm_phase_b_params:
+      - enablePhaseFilter: 'false'
+      - phasePolarity: 'kFTM_QuadPhaseNormal'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const ftm_config_t QUAD1_config = {
+  .prescale = kFTM_Prescale_Divide_1,
+  .bdmMode = kFTM_BdmMode_0,
+  .pwmSyncMode = kFTM_SoftwareTrigger,
+  .reloadPoints = 0,
+  .faultMode = kFTM_Fault_Disable,
+  .faultFilterValue = 0,
+  .deadTimePrescale = kFTM_Deadtime_Prescale_1,
+  .deadTimeValue = 0,
+  .extTriggers = 0,
+  .chnlInitState = 0,
+  .chnlPolarity = 0,
+  .useGlobalTimeBase = false
+};
+const ftm_phase_params_t QUAD1_phaseAParams = { 
+  .enablePhaseFilter = false,
+  .phasePolarity = kFTM_QuadPhaseNormal
+
+};
+const ftm_phase_params_t QUAD1_phaseBParams = { 
+  .enablePhaseFilter = false,
+  .phasePolarity = kFTM_QuadPhaseNormal
+
+};
+
+void QUAD1_init(void) {
+  FTM_Init(QUAD1_PERIPHERAL, &QUAD1_config);
+/* Initialization of the timer initial value and modulo value */
+  FTM_SetQuadDecoderModuloValue(QUAD1_PERIPHERAL, 0,5000);
+  FTM_SetupQuadDecode(QUAD1_PERIPHERAL, &QUAD1_phaseAParams, &QUAD1_phaseBParams, kFTM_QuadPhaseEncode);
+  FTM_StartTimer(QUAD1_PERIPHERAL, kFTM_SystemClock);
+}
+
+/***********************************************************************************************************************
+ * PIT1 initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'PIT1'
+- type: 'pit'
+- mode: 'LPTMR_GENERAL'
+- type_id: 'pit_a4782ba5223c8a2527ba91aeb2bc4159'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'PIT'
+- config_sets:
+  - fsl_pit:
+    - enableRunInDebug: 'false'
+    - timingConfig:
+      - clockSource: 'BusInterfaceClock'
+      - clockSourceFreq: 'GetFreq'
+    - channels:
+      - 0:
+        - channelNumber: '0'
+        - enableChain: 'false'
+        - timerPeriod: '0.005s'
+        - startTimer: 'true'
+        - enableInterrupt: 'true'
+        - interrupt:
+          - IRQn: 'PIT0_IRQn'
+          - enable_priority: 'false'
+          - enable_custom_name: 'false'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const pit_config_t PIT1_config = {
+  .enableRunInDebug = false
+};
+
+void PIT1_init(void) {
+  /* Initialize the PIT. */
+  PIT_Init(PIT1_PERIPHERAL, &PIT1_config);
+  /* Set channel 0 period to 5 ms. */
+  PIT_SetTimerPeriod(PIT1_PERIPHERAL, kPIT_Chnl_0, PIT1_0_TICKS);
+  /* Enable interrupts from channel 0. */
+  PIT_EnableInterrupts(PIT1_PERIPHERAL, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
+  /* Enable interrupt PIT1_0_IRQN request in the NVIC */
+  EnableIRQ(PIT1_0_IRQN);
+  /* Start channel 0. */
+  PIT_StartTimer(PIT1_PERIPHERAL, kPIT_Chnl_0);
+}
+
+/***********************************************************************************************************************
  * Initialization functions
  **********************************************************************************************************************/
 void BOARD_InitPeripherals(void)
 {
+  /* Initialize components */
+  QUAD1_init();
+  PIT1_init();
 }
 
 /***********************************************************************************************************************
