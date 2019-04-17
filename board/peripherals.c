@@ -35,6 +35,118 @@ component:
  * BOARD_InitPeripherals functional group
  **********************************************************************************************************************/
 /***********************************************************************************************************************
+ * PIT1 initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'PIT1'
+- type: 'pit'
+- mode: 'LPTMR_GENERAL'
+- type_id: 'pit_a4782ba5223c8a2527ba91aeb2bc4159'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'PIT'
+- config_sets:
+  - fsl_pit:
+    - enableRunInDebug: 'false'
+    - timingConfig:
+      - clockSource: 'BusInterfaceClock'
+      - clockSourceFreq: 'GetFreq'
+    - channels:
+      - 0:
+        - channelNumber: '0'
+        - enableChain: 'false'
+        - timerPeriod: '5mS'
+        - startTimer: 'true'
+        - enableInterrupt: 'true'
+        - interrupt:
+          - IRQn: 'PIT0_IRQn'
+          - enable_priority: 'false'
+          - enable_custom_name: 'false'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const pit_config_t PIT1_config = {
+  .enableRunInDebug = false
+};
+
+void PIT1_init(void) {
+  /* Initialize the PIT. */
+  PIT_Init(PIT1_PERIPHERAL, &PIT1_config);
+  /* Set channel 0 period to 5 ms. */
+  PIT_SetTimerPeriod(PIT1_PERIPHERAL, kPIT_Chnl_0, PIT1_0_TICKS);
+  /* Enable interrupts from channel 0. */
+  PIT_EnableInterrupts(PIT1_PERIPHERAL, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
+  /* Enable interrupt PIT1_0_IRQN request in the NVIC */
+  EnableIRQ(PIT1_0_IRQN);
+  /* Start channel 0. */
+  PIT_StartTimer(PIT1_PERIPHERAL, kPIT_Chnl_0);
+}
+
+/***********************************************************************************************************************
+ * UART_AUX initialization code
+ **********************************************************************************************************************/
+/* clang-format off */
+/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
+instance:
+- name: 'UART_AUX'
+- type: 'uart'
+- mode: 'transfer'
+- type_id: 'uart_cd31a12aa8c79051fda42cc851a27c37'
+- functional_group: 'BOARD_InitPeripherals'
+- peripheral: 'UART0'
+- config_sets:
+  - uartConfig_t:
+    - uartConfig:
+      - clockSource: 'BusInterfaceClock'
+      - clockSourceFreq: 'GetFreq'
+      - baudRate_Bps: '115200'
+      - parityMode: 'kUART_ParityDisabled'
+      - txFifoWatermark: '0'
+      - rxFifoWatermark: '1'
+      - idleType: 'kUART_IdleTypeStartBit'
+      - enableTx: 'true'
+      - enableRx: 'true'
+  - transferCfg:
+    - transfer:
+      - init_rx_transfer: 'true'
+      - rx_transfer:
+        - data_size: '10'
+      - init_tx_transfer: 'true'
+      - tx_transfer:
+        - data_size: '10'
+      - init_callback: 'false'
+      - callback_fcn: ''
+      - user_data: ''
+    - quick_selection: 'QuickSelection1'
+ * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
+/* clang-format on */
+const uart_config_t UART_AUX_config = {
+  .baudRate_Bps = 115200,
+  .parityMode = kUART_ParityDisabled,
+  .txFifoWatermark = 0,
+  .rxFifoWatermark = 1,
+  .idleType = kUART_IdleTypeStartBit,
+  .enableTx = true,
+  .enableRx = true
+};
+uart_handle_t UART_AUX_handle;
+uint8_t UART_AUX_rxBuffer[UART_AUX_RX_BUFFER_SIZE];
+const uart_transfer_t UART_AUX_rxTransfer = {
+  .data = UART_AUX_rxBuffer,
+  .dataSize = UART_AUX_RX_BUFFER_SIZE
+};
+uint8_t UART_AUX_txBuffer[UART_AUX_TX_BUFFER_SIZE];
+const uart_transfer_t UART_AUX_txTransfer = {
+  .data = UART_AUX_txBuffer,
+  .dataSize = UART_AUX_TX_BUFFER_SIZE
+};
+
+void UART_AUX_init(void) {
+  UART_Init(UART_AUX_PERIPHERAL, &UART_AUX_config, UART_AUX_CLOCK_SOURCE);
+  UART_TransferCreateHandle(UART_AUX_PERIPHERAL, &UART_AUX_handle, NULL, NULL);
+}
+
+/***********************************************************************************************************************
  * QUAD1 initialization code
  **********************************************************************************************************************/
 /* clang-format off */
@@ -45,7 +157,7 @@ instance:
 - mode: 'QuadratureDecoder'
 - type_id: 'ftm_04a15ae4af2b404bf2ae403c3dbe98b3'
 - functional_group: 'BOARD_InitPeripherals'
-- peripheral: 'FTM1'
+- peripheral: 'FTM2'
 - config_sets:
   - ftm_main_config:
     - ftm_config:
@@ -115,61 +227,14 @@ void QUAD1_init(void) {
 }
 
 /***********************************************************************************************************************
- * PIT1 initialization code
- **********************************************************************************************************************/
-/* clang-format off */
-/* TEXT BELOW IS USED AS SETTING FOR TOOLS *************************************
-instance:
-- name: 'PIT1'
-- type: 'pit'
-- mode: 'LPTMR_GENERAL'
-- type_id: 'pit_a4782ba5223c8a2527ba91aeb2bc4159'
-- functional_group: 'BOARD_InitPeripherals'
-- peripheral: 'PIT'
-- config_sets:
-  - fsl_pit:
-    - enableRunInDebug: 'false'
-    - timingConfig:
-      - clockSource: 'BusInterfaceClock'
-      - clockSourceFreq: 'GetFreq'
-    - channels:
-      - 0:
-        - channelNumber: '0'
-        - enableChain: 'false'
-        - timerPeriod: '0.005s'
-        - startTimer: 'true'
-        - enableInterrupt: 'true'
-        - interrupt:
-          - IRQn: 'PIT0_IRQn'
-          - enable_priority: 'false'
-          - enable_custom_name: 'false'
- * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
-/* clang-format on */
-const pit_config_t PIT1_config = {
-  .enableRunInDebug = false
-};
-
-void PIT1_init(void) {
-  /* Initialize the PIT. */
-  PIT_Init(PIT1_PERIPHERAL, &PIT1_config);
-  /* Set channel 0 period to 5 ms. */
-  PIT_SetTimerPeriod(PIT1_PERIPHERAL, kPIT_Chnl_0, PIT1_0_TICKS);
-  /* Enable interrupts from channel 0. */
-  PIT_EnableInterrupts(PIT1_PERIPHERAL, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
-  /* Enable interrupt PIT1_0_IRQN request in the NVIC */
-  EnableIRQ(PIT1_0_IRQN);
-  /* Start channel 0. */
-  PIT_StartTimer(PIT1_PERIPHERAL, kPIT_Chnl_0);
-}
-
-/***********************************************************************************************************************
  * Initialization functions
  **********************************************************************************************************************/
 void BOARD_InitPeripherals(void)
 {
   /* Initialize components */
-  QUAD1_init();
   PIT1_init();
+  UART_AUX_init();
+  QUAD1_init();
 }
 
 /***********************************************************************************************************************

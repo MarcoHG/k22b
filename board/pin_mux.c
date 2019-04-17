@@ -42,8 +42,9 @@ BOARD_InitPins:
   - {pin_num: '2', peripheral: UART1, signal: RX, pin_signal: ADC1_SE5a/PTE1/LLWU_P0/SPI1_SOUT/UART1_RX/I2C1_SCL/SPI1_SIN}
   - {pin_num: '23', peripheral: UART0, signal: RX, pin_signal: PTA1/UART0_RX/FTM0_CH6/JTAG_TDI/EZP_DI}
   - {pin_num: '24', peripheral: UART0, signal: TX, pin_signal: PTA2/UART0_TX/FTM0_CH7/JTAG_TDO/TRACE_SWO/EZP_DO}
-  - {pin_num: '35', peripheral: FTM1, signal: 'QD_PH, A', pin_signal: ADC0_SE8/ADC1_SE8/PTB0/LLWU_P5/I2C0_SCL/FTM1_CH0/FTM1_QD_PHA}
-  - {pin_num: '36', peripheral: FTM1, signal: 'QD_PH, B', pin_signal: ADC0_SE9/ADC1_SE9/PTB1/I2C0_SDA/FTM1_CH1/FTM1_QD_PHB}
+  - {pin_num: '41', peripheral: FTM2, signal: 'QD_PH, A', pin_signal: PTB18/FTM2_CH0/I2S0_TX_BCLK/FB_AD15/FTM2_QD_PHA}
+  - {pin_num: '42', peripheral: FTM2, signal: 'QD_PH, B', pin_signal: PTB19/FTM2_CH1/I2S0_TX_FS/FB_OE_b/FTM2_QD_PHB}
+  - {pin_num: '62', peripheral: GPIOD, signal: 'GPIO, 5', pin_signal: ADC0_SE6b/PTD5/SPI0_PCS2/UART0_CTS_b/FTM0_CH5/FB_AD1/EWM_OUT_b/SPI1_SCK, identifier: ''}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -60,6 +61,8 @@ void BOARD_InitPins(void)
     CLOCK_EnableClock(kCLOCK_PortA);
     /* Port B Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortB);
+    /* Port D Clock Gate Control: Clock enabled */
+    CLOCK_EnableClock(kCLOCK_PortD);
     /* Port E Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortE);
 
@@ -69,11 +72,14 @@ void BOARD_InitPins(void)
     /* PORTA2 (pin 24) is configured as UART0_TX */
     PORT_SetPinMux(BOARD_INITPINS_LEDRGB_GREEN_PORT, BOARD_INITPINS_LEDRGB_GREEN_PIN, kPORT_MuxAlt2);
 
-    /* PORTB0 (pin 35) is configured as FTM1_QD_PHA */
-    PORT_SetPinMux(PORTB, 0U, kPORT_MuxAlt6);
+    /* PORTB18 (pin 41) is configured as FTM2_QD_PHA */
+    PORT_SetPinMux(PORTB, 18U, kPORT_MuxAlt6);
 
-    /* PORTB1 (pin 36) is configured as FTM1_QD_PHB */
-    PORT_SetPinMux(PORTB, 1U, kPORT_MuxAlt6);
+    /* PORTB19 (pin 42) is configured as FTM2_QD_PHB */
+    PORT_SetPinMux(PORTB, 19U, kPORT_MuxAlt6);
+
+    /* PORTD5 (pin 62) is configured as PTD5 */
+    PORT_SetPinMux(PORTD, 5U, kPORT_MuxAsGpio);
 
     /* PORTE0 (pin 1) is configured as UART1_TX */
     PORT_SetPinMux(PORTE, 0U, kPORT_MuxAlt3);

@@ -10,9 +10,10 @@
  * Included files
  **********************************************************************************************************************/
 #include "fsl_common.h"
+#include "fsl_pit.h"
+#include "fsl_uart.h"
 #include "fsl_clock.h"
 #include "fsl_ftm.h"
-#include "fsl_pit.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -22,14 +23,6 @@ extern "C" {
  * Definitions
  **********************************************************************************************************************/
 /* Definitions for BOARD_InitPeripherals functional group */
-/* Definition of peripheral ID */
-#define QUAD1_PERIPHERAL FTM1
-/* Definition of the clock source frequency */
-#define QUAD1_CLOCK_SOURCE CLOCK_GetFreq(kCLOCK_BusClk)
-/* QUAD1 interrupt vector ID (number). */
-#define QUAD1_IRQN FTM2_IRQn
-/* QUAD1 interrupt handler identifier. */
-#define QUAD1_IRQHANDLER FTM2_IRQHandler
 /* BOARD_InitPeripherals defines for PIT */
 /* Definition of peripheral ID. */
 #define PIT1_PERIPHERAL PIT
@@ -43,12 +36,34 @@ extern "C" {
 #define PIT1_0_IRQN PIT0_IRQn
 /* PIT1 interrupt handler identifier. */
 #define PIT1_0_IRQHANDLER PIT0_IRQHandler
+/* Definition of peripheral ID */
+#define UART_AUX_PERIPHERAL UART0
+/* Definition of the clock source frequency */
+#define UART_AUX_CLOCK_SOURCE CLOCK_GetFreq(UART0_CLK_SRC)
+/* Rx transfer buffer size. */
+#define UART_AUX_RX_BUFFER_SIZE 10
+/* Tx transfer buffer size. */
+#define UART_AUX_TX_BUFFER_SIZE 10
+/* Definition of peripheral ID */
+#define QUAD1_PERIPHERAL FTM2
+/* Definition of the clock source frequency */
+#define QUAD1_CLOCK_SOURCE CLOCK_GetFreq(kCLOCK_BusClk)
+/* QUAD1 interrupt vector ID (number). */
+#define QUAD1_IRQN FTM2_IRQn
+/* QUAD1 interrupt handler identifier. */
+#define QUAD1_IRQHANDLER FTM2_IRQHandler
 
 /***********************************************************************************************************************
  * Global variables
  **********************************************************************************************************************/
-extern const ftm_config_t QUAD1_config;
 extern const pit_config_t PIT1_config;
+extern const uart_config_t UART_AUX_config;
+extern uart_handle_t UART_AUX_handle;
+extern uint8_t UART_AUX_rxBuffer[UART_AUX_RX_BUFFER_SIZE];
+extern const uart_transfer_t UART_AUX_rxTransfer;
+extern uint8_t UART_AUX_txBuffer[UART_AUX_TX_BUFFER_SIZE];
+extern const uart_transfer_t UART_AUX_txTransfer;
+extern const ftm_config_t QUAD1_config;
 
 /***********************************************************************************************************************
  * Initialization functions

@@ -3,7 +3,13 @@ Develop a project using the SDK components, record insights to share with collea
 
 Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can by access using OSDA.
 
-Next use userData to pass the structure
+## Added QUAD setting 0.1.3
+- added FTM2 for QuadDecoder
+- added structure to input parameters from serial console
+- support for GPIO PTD5 to drive BLUE_LED benchmark and observe serial port usage
+- start init (home) routine
+- version.h
+ 
 
 ## Add Second UART 0.2
 -	Added a structure `stTransferUart` to organize variables of transfer-Uart method 
@@ -68,29 +74,7 @@ Create a delay loop inside the main loop to stress serial port by sending 50 cha
 
 Verify that number of received chars is multiple of 50
 
-## Arduino J2 Connector
-J2 	| Arduino | K22 Port | function
----|---|---|---
-20 	| D15 	| PTE1 	| UART1_RX	(R71) 
-18 	| D14 	| PTE0 	| UART1_TX
-16	| AREF 	| AREF 	| 
-14	| GND 	| GND  	| 
-12	| D13 	| PTD5 	| 
-10	| D12 	| PTD7 	| 
-9		| D11 	| PTD6 	| 
-6		| D10 	| PTD4 	| UART0_RTS
-4		| D9 		| PTA1 	| UART0_RX
-2		| D8 		| PTB18	| 
 
-## Arduino J1 Connector
-J1 	| Arduino | K22 Port | function
----|---|---|---
-16	| D7 	| PTC6 	| 
-14	| D6 	| PTC3 	| 
-12	| D5 	| PTB18 | 
-10	| D4 	| PTA4	| 
-9		| D3 	| PTA2 	| UART0_TX
-6		| D2 	| PTB16	| 
-4		| D1 	| PTD3 	| UART2_TX
-2		| D0 	| PTD2	| UART2_RX
+
+
 
