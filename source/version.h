@@ -12,9 +12,9 @@
 #define SOURCES_APP_VERSION_H_
 
 #define	HW_VERS 	'0'
-#define SW_MAJOR	1
+#define SW_MAJOR	0
 #define SW_MINOR	1
-#define SW_BUILD	5
+#define SW_BUILD	4
 
 
 

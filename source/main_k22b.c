@@ -11,7 +11,7 @@
 
 #include <string.h>
 #include "settings.h"
-
+#include "version.h"
 
 
 /*******************************************************************************
@@ -23,7 +23,8 @@
 #define TX_BUFFER_LENGTH 128
 #define RX_BUFFER_LENGTH 128
 
-#define PIT_MILLI_SEC				5		// Match the PIT component
+#define PIT_MILLI_SEC				5			// Match the PIT component
+#define QUAD_MODULO					5000	// From component 0..QUAD_MODULO
 #define AMPLIFIER_TIME_OUT 5000
 
 #define NOT_MOVING_POS	5				// Counts to declare 'not moving'
@@ -73,7 +74,10 @@ stTransferUart sDbgUartTransfer;
 stTransferUart sAuxUartTransfer;
 
 volatile bool pitIsrFlag = false;
-volatile uint32_t encoder_count = 0U;
+volatile int32_t encoder_count = 0U;
+volatile bool req_reset_encoder = false;
+volatile int32_t	door_length =0;
+
 
 inputSet_t 	gsSettings[] =
 {
@@ -84,9 +88,14 @@ inputSet_t 	gsSettings[] =
 	{ "WAITO",    0,	40000U, &gSets.waitAtOpenMsec },	// 5 to 40,000
 	{ "CHKP",  		5,	80,     &gSets.checkPercent   },	// 5 to 80
 	{ "PARTOP", 	5,	50,     &gSets.partialPercent },	// 5 to 50
+	{ "CLIM", 		0,	127,    &gSets.currentLimit		},	// 0 to 127
+	{ "RLIM", 		0,	127,    &gSets.regenLimit			},	// 0 to 127
+	{ "ACEL", 		0,	127,    &gSets.acel						},	// 0 to 127
+	{ "DECEL", 		0,	127,    &gSets.decel					},	// 0 to 127
+
 	{ "CHKDIR",   0,	1,   	  &gSets.checkSpeedDir  },	// 0 to 1
-	{ "MODE",			0,	2,		  &gSets.mode           }, //  07 Mode 0: run,	1:manual, 2:amplifier
-	{ "OPE",			0,	2,		  &gSets.operation      }, //  08 Manual Operation 0: Init,	1:Open, 2:close
+	{ "MODE",			0,	2,		  &gSets.mode           }, 	//  07 Mode 0: run,	1:manual, 2:amplifier
+	{ "OPE",			0,	2,		  &gSets.operation      }, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
 		// Read Only settings
 
 };
@@ -106,6 +115,33 @@ void PIT1_0_IRQHANDLER (void )
 	    PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
 	    pitIsrFlag = true;
 
+	static uint32_t previous_count;
+	uint32_t	counts = 0;
+	int32_t	delta_counts = 0;
+	if(req_reset_encoder)
+	{
+		req_reset_encoder = false;
+		encoder_count =0;
+		FTM_ClearQuadDecoderCounterValue(QUAD1_PERIPHERAL);
+
+	}
+	else
+	{
+		//uint32_t flags 	= FTM_GetQuadDecoderFlags(QUAD1_PERIPHERAL);
+		counts 						=		FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);
+		bool overflow_pos = 	previous_count > QUAD_MODULO/2  && counts < QUAD_MODULO/2;
+		bool overflow_neg = 	previous_count < QUAD_MODULO/2  && counts > QUAD_MODULO/2;
+		if(overflow_pos)
+			delta_counts = counts - (QUAD_MODULO - previous_count) +1;
+		else
+		if(overflow_neg)
+			delta_counts = 	-((counts - QUAD_MODULO) + 1 - previous_count);
+		else
+			delta_counts = 	(int32_t)counts - (int32_t)previous_count;
+	}
+	previous_count = counts;
+	encoder_count += delta_counts;
+
 
 
 	    /* Add for ARM errata 838869, affects Cortex-M4, Cortex-M4F Store immediate overlapping
@@ -113,6 +149,24 @@ void PIT1_0_IRQHANDLER (void )
 	#if defined __CORTEX_M && (__CORTEX_M == 4U)
 	    __DSB();
 	#endif
+}
+/*!
+ * \brief Create a blocking delay using PIT isr
+ *
+ *
+ */
+void delay_ms(uint32_t delay)
+{
+	uint32_t counts = delay / PIT_MILLI_SEC;
+	pitIsrFlag = false;
+	for(int i =0; i <= counts ;)
+		if(pitIsrFlag)
+		{
+			pitIsrFlag = false;
+			++i;
+		}
+
+
 }
 
 /* Debug UART user callback */
@@ -346,10 +400,11 @@ void initHardware(void)
 	pConfig->baudRate_Bps = 115200;
 	initTransferUart(&sDbgUartTransfer, UART1, UART_DebugCallback, UART1_CLK_SRC);
 
-	printf("Debug UART - Input hex commands and 'enter' to send it to auxport\r\n");// Test retarget at UART1
+	printf("Linear Doors Control - WCC Version %d.%d.%d\r\n", SW_MAJOR, SW_MINOR, SW_BUILD);// Test retarget at UART1
 
 	// Initialize PIT & Quad Decoder
   BOARD_InitPeripherals(); //	This initializes UART0 on *.mex 
+  FTM_SetQuadDecoderModuloValue(QUAD1_PERIPHERAL, 0, QUAD_MODULO);	// over-ride QUAD_MODULO peripherals
 
 	// Auxiliary Uart = UART0
 	pConfig = &sAuxUartTransfer.config;
@@ -360,7 +415,8 @@ void initHardware(void)
 	pConfig->baudRate_Bps = 9600;
 	initTransferUart(&sAuxUartTransfer, UART0, UART_AuxCallback, UART0_CLK_SRC);
 	//
-	uint8_t msg[] = "Hello from Auxiliary Uart - echo input\r";
+	// msg to test aux port
+	uint8_t msg[] = "HelloAuxUart";
 	sAuxUartTransfer.txTransfer.data = sAuxUartTransfer.txBuffer;
 	sAuxUartTransfer.txTransfer.dataSize = sizeof(msg) - 1;
 	memcpy(sAuxUartTransfer.txBuffer, msg, sizeof(msg) - 1);
@@ -368,6 +424,18 @@ void initHardware(void)
 	UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
 	    &sAuxUartTransfer.txTransfer);
 
+	// Flush AUX to avoid echo Amplifier
+	pitIsrFlag =false;
+	for(uint8_t pitIsr=0; pitIsr < 10; )
+	{
+		if(pitIsrFlag)
+		{
+			pitIsrFlag = false;
+			++pitIsr;
+		}
+		uint8_t cha;
+		getRxRingBuffer(&sAuxUartTransfer, &cha);	// Flush RX
+	}
 	//	-- how to set an interrupt on Transmission complete?
 	// volatile UART_Type *base = UART0;
 	// base->C2 |= UART_C2_TCIE_MASK;	// need to add the status kStatus_UART_TxBusy
@@ -378,6 +446,15 @@ void initHardware(void)
   GPIO_PinInit(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, &led_config);
 
 }
+
+void initValues(void)
+{
+	gSets.currentLimit 	= 30;		//
+	gSets.acel					= 20;
+	gSets.decel					= 20;
+	gSets.checkSpeed		= 32;
+}
+
 /*!
  * @brief Send data to the Aux serial port
  *
@@ -468,41 +545,65 @@ int32_t	absVal(int32_t v)
 	return v < 0	? -v	: v;
 }
 
-void initSequence(void)
+bool initSequence(int32_t *position_range)
 {
-
 	// Set to UART mode
-	sendAuxCommand(0xE1);
+	if( !sendAuxCommand(0xE1))
+		return false;
 	// Set Current Limit
-	sendAuxSetCommand(0x82, 0x05);
+	if(!sendAuxSetCommand(0x82, gSets.currentLimit))		// TBD
+		return false;
 	// Set Acel
-	sendAuxSetCommand(0x84, 0x20);
+	if( !sendAuxSetCommand(0x84, gSets.acel) )		// gSets.acel, gSets.decel
+		return false;
 	// Set Decel
-	sendAuxSetCommand(0x85, 0x20);
-	// Set Fwd
-	sendAuxSetCommand(0x8A, 0x01);
+	if( !sendAuxSetCommand(0x85, gSets.decel) )
+		return false;
+	// Set STOP
+	if( !sendAuxSetCommand(0x8A, 0x00) )
+		return false;
 
-	uint32_t position = 0;
-	uint32_t position_old = 0;
-	FTM_ClearQuadDecoderCounterValue(QUAD1_PERIPHERAL);
+	// Prepare position
+	int32_t position 			= 0;
+	int32_t position_old 	= 0;
+	int32_t position_at_open, position_at_close;
+	req_reset_encoder = true;	// reset the position
 
 	// Set Speed
-	sendAuxSetCommand(0x80, 0x1F);
+	if( !sendAuxSetCommand(0x80, gSets.checkSpeed))
+		return false;
+
 	// Monitor POsition
 	pitIsrFlag = false;
-	bool moving = true;
 
-	uint8_t cha;
 	uint16_t zeroSpeed=0;
-	while(getRxRingBuffer(&sAuxUartTransfer, &cha));	// Flush RX
-	printf("Reaching full open position\r\n");
+	for (uint8_t cha; getRxRingBuffer(&sAuxUartTransfer, &cha); );	// Flush RX
+	printf("\r\nInit Doors..");
+	bool moving = false;
+	typedef enum direction_t {OPEN=0, CLOSE, DONE} direction_t;
+	direction_t motorDirection = OPEN;
+	while(motorDirection == OPEN || motorDirection == CLOSE)
+	if(!moving)
+	{
+		// Start moving
+		uint8_t dir;
+		char moving_str[2][10] = {"Openning", "Closing"};
+		dir = (motorDirection == OPEN) ?  0x01 : 0x02;
+		if( !sendAuxSetCommand(0x8A, dir) )	// Start moving FWD
+			return false;
+		printf("\r\n%s...\r\n",moving_str[dir-1]);
+		moving = true;
+	}
+	else
 	while(moving)
 	{
 		static uint16_t counts=0;
-		position = FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);
+		uint8_t cha;
+		// Every 5mS
 		if(pitIsrFlag)
 		{
 			pitIsrFlag = false;
+			position = encoder_count;
 			if(++counts >=25)	// 125mS
 			{
 				counts =0;
@@ -519,18 +620,31 @@ void initSequence(void)
 		if(getRxRingBuffer(&sAuxUartTransfer, &cha))
 			printf(" [%x]",0xFF&cha);
 		if(zeroSpeed >= 40)	// 5 secs
+		{
 			moving = false;
-
-
-
+			zeroSpeed = 0;
+			if(motorDirection == OPEN)
+			{
+				position_at_open = position;
+				req_reset_encoder = true;
+				// delay_ms(10);
+			}
+			else
+				position_at_close = position;
+			++motorDirection;
+		}
 	}
-	// Set Speed
+	// Wait for any previous reading to display
+	// delay_ms(50); // full duplex not needed
+
+	// Set current position as "Home"
+	req_reset_encoder = true;
+	// Set Speed to zero
 	sendAuxSetCommand(0x80, 0x00);
-	// Set to stop
+	// Set to stop mode
 	sendAuxSetCommand(0x8A, 0x00);
-
-
-
+	*position_range = absVal(position_at_close);
+	return true;
 
 }
 /*!
@@ -547,6 +661,7 @@ int main(void)
 	uint8_t cmd_index=0;
 
 	initHardware();
+	initValues();
 	char inStr[50]={0}, outStr[50]={0};
 
 	parse_result_t result;
@@ -562,10 +677,10 @@ int main(void)
 		// Handle Debug Console
 		if(getRxRingBuffer(&sDbgUartTransfer, &ch))
 		{
-		  if(ch == '~' && gSets.mode == MODE_AMPLIFIER)
+		  if(ch == '`' && gSets.mode == MODE_AMPLIFIER)
 		  {
-		  	counts = FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);	// encoder_count = FTM_GetQuadDecoderCounterValue(DEMO_FTM_BASEADDR);
-		  	printf("E: %d\r\n", counts);
+		  	//counts = FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);	// encoder_count = FTM_GetQuadDecoderCounterValue(DEMO_FTM_BASEADDR);
+		  	printf("E: %ld\r\n", encoder_count);
 		  }
 		  else
 		  if (buildStdInArg(ch, inStr) )
@@ -588,11 +703,14 @@ int main(void)
 					if(strcmp(gsSettings[index].pToken,"OPE")==0 && *gsSettings[index].pData == 0)
 					{
 						// Ope=0 init
-						initSequence();
+						if( initSequence(&door_length) )
+							printf("\r\nInit complete, range: %ld counts", door_length);
+						else
+							printf("\r\nInit Sequence Failed!");
 
 					}
-
-					printf(" OK\r\n");
+					else
+						printf(" OK\r\n");
 					break;
 				case PARSE_READ:
 					printf(" %s\r\n",outStr);

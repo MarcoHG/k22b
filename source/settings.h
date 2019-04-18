@@ -55,6 +55,11 @@ typedef struct settings
   int32_t waitAtOpenMsec;
   int32_t checkPercent;
   int32_t partialPercent;
+  int32_t currentLimit;
+  int32_t regenLimit;
+  int32_t acel;
+  int32_t decel;
+
   int32_t checkSpeedDir;
   int32_t mode;
   int32_t operation;

@@ -3,6 +3,10 @@ Develop a project using the SDK components, record insights to share with collea
 
 Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can by access using OSDA.
 
+## Completed Init sequence 0.1.4
+- Encoder position is int32_t and is updated at PIT
+- Init sequence uses global settings
+
 ## Added QUAD setting 0.1.3
 - added FTM2 for QuadDecoder
 - added structure to input parameters from serial console
