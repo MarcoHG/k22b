@@ -59,10 +59,14 @@ typedef struct settings
   int32_t regenLimit;
   int32_t acel;
   int32_t decel;
-
   int32_t checkSpeedDir;
+  // spares
+  int32_t set1;
+  int32_t set2;
+  // commands
   int32_t mode;
   int32_t operation;
+  int32_t flash;
 } stSettings;
 
 parse_result_t parseInStr(inputSet_t *pSett, char *inStr, char *outStr, uint8_t *pIndex);

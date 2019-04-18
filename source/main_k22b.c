@@ -25,7 +25,7 @@
 
 #define PIT_MILLI_SEC				5			// Match the PIT component
 #define QUAD_MODULO					5000	// From component 0..QUAD_MODULO
-#define AMPLIFIER_TIME_OUT 5000
+#define AMPLIFIER_TIME_OUT  5000
 
 #define NOT_MOVING_POS	5				// Counts to declare 'not moving'
 typedef struct _stTransferUart
@@ -76,26 +76,30 @@ stTransferUart sAuxUartTransfer;
 volatile bool pitIsrFlag = false;
 volatile int32_t encoder_count = 0U;
 volatile bool req_reset_encoder = false;
-volatile int32_t	door_length =0;
+volatile int32_t	gDoor_length =0;
+
 
 
 inputSet_t 	gsSettings[] =
 {
-		// Read and write
-	{ "CHKS",     0,	127,		&gSets.checkSpeed     },	// 0 to 127
-	{ "CLOSES",   0,	127,    &gSets.closingSpeed   },	// 0 to 127
-	{ "APERTS",   0,	127,    &gSets.apertureSpeed  },	// 0 to 127
-	{ "WAITO",    0,	40000U, &gSets.waitAtOpenMsec },	// 5 to 40,000
-	{ "CHKP",  		5,	80,     &gSets.checkPercent   },	// 5 to 80
-	{ "PARTOP", 	5,	50,     &gSets.partialPercent },	// 5 to 50
-	{ "CLIM", 		0,	127,    &gSets.currentLimit		},	// 0 to 127
-	{ "RLIM", 		0,	127,    &gSets.regenLimit			},	// 0 to 127
-	{ "ACEL", 		0,	127,    &gSets.acel						},	// 0 to 127
-	{ "DECEL", 		0,	127,    &gSets.decel					},	// 0 to 127
+				// Read and write parameters
+/* 0  */	{ "CHKS",     0,	127,		&gSets.checkSpeed     },	// 0 to 127
+/* 1  */	{ "CLOSES",   0,	127,    &gSets.closingSpeed   },	// 0 to 127
+/* 2  */	{ "APERTS",   0,	127,    &gSets.apertureSpeed  },	// 0 to 127
+/* 3  */	{ "WAITO",    0,	40000U, &gSets.waitAtOpenMsec },	// 5 to 40,000
+/* 4  */	{ "CHKP",  		5,	80,     &gSets.checkPercent   },	// 5 to 80
+/* 5  */	{ "PARTOP", 	5,	50,     &gSets.partialPercent },	// 5 to 50
+/* 6  */	{ "CLIM", 		0,	127,    &gSets.currentLimit		},	// 0 to 127
+/* 7  */	{ "RLIM", 		0,	127,    &gSets.regenLimit			},	// 0 to 127
+/* 8  */	{ "ACEL", 		0,	127,    &gSets.acel						},	// 0 to 127
+/* 9  */	{ "DECEL", 		0,	127,    &gSets.decel					},	// 0 to 127
+/* 10 */	{ "CHKDIR",   0,	1,   	  &gSets.checkSpeedDir  },	// 0 to 1
+/* 11 */	{ "SET1",   	0,	1,   	  &gSets.set1  					},	// 0 to 1
+/* 12 */	{ "SET2",   	0,	1,   	  &gSets.set2  					},	// 0 to 1
 
-	{ "CHKDIR",   0,	1,   	  &gSets.checkSpeedDir  },	// 0 to 1
-	{ "MODE",			0,	2,		  &gSets.mode           }, 	//  07 Mode 0: run,	1:manual, 2:amplifier
-	{ "OPE",			0,	2,		  &gSets.operation      }, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
+/* 13 */	{ "MODE",			0,	2,		  &gSets.mode           }, 	//  07 Mode 0: run,	1:manual, 2:amplifier
+/* 14 */	{ "OPE",			0,	2,		  &gSets.operation      }, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
+/* 15 */	{ "FLASH",		0,	2,		  &gSets.flash     			}, 	//  08 flash Operation 0: write,	1:Read
 		// Read Only settings
 
 };
@@ -108,6 +112,11 @@ stSettings gSets;
 /*******************************************************************************
  * Code
  ******************************************************************************/
+void trap_error(char *pMsg)
+{
+	volatile char *pDebug = pMsg;	// Debug point
+	while(1);
+}
 /* PIT IRQ */
 void PIT1_0_IRQHANDLER (void )
 {
@@ -449,10 +458,13 @@ void initHardware(void)
 
 void initValues(void)
 {
-	gSets.currentLimit 	= 30;		//
+	gSets.currentLimit 	= 20;		//
 	gSets.acel					= 20;
 	gSets.decel					= 20;
-	gSets.checkSpeed		= 32;
+	gSets.checkSpeed		= 40;
+	gSets.apertureSpeed	=	80;
+	gSets.closingSpeed 	= 65;
+	gSets.checkPercent  = 50;
 }
 
 /*!
@@ -544,6 +556,137 @@ int32_t	absVal(int32_t v)
 {
 	return v < 0	? -v	: v;
 }
+
+bool closeSequence(void)
+{
+	// Set Speed
+	if( !sendAuxSetCommand(0x80, gSets.closingSpeed))
+		return false;
+
+	// Monitor Zero speed
+	pitIsrFlag = false;
+	uint16_t zeroSpeed=0;
+	int32_t position 			= 0;
+	int32_t position_old 	= 0;
+
+	for (uint8_t cha; getRxRingBuffer(&sAuxUartTransfer, &cha); );	// Flush RX
+	// Start Moving REV
+	if( !sendAuxSetCommand(0x8A, 0x02))
+		return false;
+	bool moving = true;
+	int32_t closeSpdPos = gDoor_length * gSets.checkPercent/100;
+	bool atCheckSpeed = false;
+	printf("\r\nClosing Doors..%ld, %ld@%ld->0\r\n", gSets.closingSpeed, gSets.checkSpeed, closeSpdPos);
+	while(moving)
+	{
+		static uint16_t counts=0;
+		uint8_t cha;
+		// Every 5mS
+		if(pitIsrFlag)
+		{
+			pitIsrFlag = false;
+			position = encoder_count;
+			if(++counts >=25)	// 125mS
+			{
+				counts =0;
+				if(absVal(position_old - position) < NOT_MOVING_POS )
+					++zeroSpeed;
+				else
+					zeroSpeed=0;
+				position_old = position;
+				if(encoder_count < closeSpdPos && !atCheckSpeed)
+				{
+					atCheckSpeed = true;
+					sendAuxSetCommand(0x80, gSets.checkSpeed);
+
+				}
+				char speed = atCheckSpeed ? 'C' : 'O';
+				printf("\rPos= %ld, %d, '%c' Clim:", position, zeroSpeed, speed );
+				sendAmpByte(0xCA);	// Read Current
+			}
+		}
+		// Read response from Amplifier
+		if(getRxRingBuffer(&sAuxUartTransfer, &cha))
+			printf(" [%x]",0xFF&cha);
+		if(zeroSpeed >= 40)	// 5 secs
+		{
+			moving = false;
+			zeroSpeed = 0;
+		}
+	}
+	// Set Speed to zero
+	sendAuxSetCommand(0x80, 0x00);
+	// Set to stop mode
+	sendAuxSetCommand(0x8A, 0x00);
+	return true;
+}
+
+
+
+bool openSequence(void)
+{
+	// Set Speed
+	if( !sendAuxSetCommand(0x80, gSets.apertureSpeed))
+		return false;
+
+	// Monitor Zero speed
+	pitIsrFlag = false;
+	uint16_t zeroSpeed=0;
+	int32_t position 			= 0;
+	int32_t position_old 	= 0;
+
+	for (uint8_t cha; getRxRingBuffer(&sAuxUartTransfer, &cha); );	// Flush RX
+	// Start Moving FWD
+	if( !sendAuxSetCommand(0x8A, 0x01))
+		return false;
+	bool moving = true;
+	int32_t openSpdPos = gDoor_length * gSets.checkPercent/100;
+	bool atCheckSpeed = false;
+	printf("\r\nOpenning Doors..%ld, %ld@%ld->%ld\r\n", gSets.apertureSpeed, gSets.checkSpeed, openSpdPos,gDoor_length );
+	while(moving)
+	{
+		static uint16_t counts=0;
+		uint8_t cha;
+		// Every 5mS
+		if(pitIsrFlag)
+		{
+			pitIsrFlag = false;
+			position = encoder_count;
+			if(++counts >=25)	// 125mS
+			{
+				counts =0;
+				if(absVal(position_old - position) < NOT_MOVING_POS )
+					++zeroSpeed;
+				else
+					zeroSpeed=0;
+				position_old = position;
+				if(encoder_count > openSpdPos && !atCheckSpeed)
+				{
+					atCheckSpeed = true;
+					sendAuxSetCommand(0x80, gSets.checkSpeed);
+
+				}
+				char speed = atCheckSpeed ? 'C' : 'O';
+				printf("\rPos= %ld, %d, %c Clim:", position, zeroSpeed, speed );
+				sendAmpByte(0xCA);	// Read Current
+			}
+		}
+		// Read response from Amplifier
+		if(getRxRingBuffer(&sAuxUartTransfer, &cha))
+			printf(" [%x]",0xFF&cha);
+		if(zeroSpeed >= 40)	// 5 secs
+		{
+			moving = false;
+			zeroSpeed = 0;
+		}
+	}
+	// Set Speed to zero
+	sendAuxSetCommand(0x80, 0x00);
+	// Set to stop mode
+	sendAuxSetCommand(0x8A, 0x00);
+	return true;
+}
+
 
 bool initSequence(int32_t *position_range)
 {
@@ -647,6 +790,90 @@ bool initSequence(int32_t *position_range)
 	return true;
 
 }
+
+/*!
+ *	@brief	Execute the indicated command
+ *
+ *	User has input a value to the gsSettings[index] and this function performs
+ *	the desired operation
+ *
+ */
+void executeCommand(index)
+{
+	switch(index)
+	{
+	case 0 : //	 "CHKS",
+	case 1 : //	 "CLOSES"
+	case 2 : //	 "APERTS"
+	case 3 : //	 "WAITO",
+	case 4 : //	 "CHKP",
+	case 5 : //	 "PARTOP"
+	case 6 : //	 "CLIM",
+	case 7 : //	 "RLIM",
+	case 8 : //	 "ACEL",
+	case 9 : //	 "DECEL",
+  case 10: //	 "CHKDIR"
+  case 11: //	 spare1
+  case 12: //	 spare2
+  	printf(" [%ld]",*gsSettings[index].pData);
+  	break;
+  case 13: //	 "MODE"
+  	switch(*gsSettings[index].pData)
+  	{
+  	case	0:
+  		printf("\r\nRun mode\r\n");
+  		break;
+  	case 	1:
+  		printf("\r\nManual mode\r\n");
+  		break;
+  	case	2:
+  		printf("\r\nAmplifier commands accepted - enter 'end' to finish this mode\r\n");
+  		break;
+  	}
+  	break;
+  case 14: //	 "OPE"
+  	switch(*gsSettings[index].pData)	//
+  	{
+  	case	0:	// OPE=0 to HOME
+  		if( initSequence(&gDoor_length) )
+  			printf("\r\nInit complete, range: %ld counts\r\n", gDoor_length);
+  		else
+  			printf("\r\nInit Sequence Failed!");
+  		break;
+  	case	1:	// OPE=1 to OPEN
+  		if(openSequence() )
+  			printf("\r\nDoor is open..");
+  		else
+  			printf("\r\nOPEN Sequence Failed!");
+  		break;
+  	case	2:	// OPE=2 to CLOSE
+  		if(closeSequence() )
+  		{
+  		  printf("\r\nDoor is closed OK, setting this position as HOME\r\n");
+  		  req_reset_encoder=true;
+  		}
+  		else
+  			printf("\r\nOPEN Sequence Failed!");
+  		break;
+  		break;
+  	default:
+  		trap_error("Unkown OPE");
+  		break;
+  	}
+  	break;
+  case 15:	// Flash operation
+  	if(*gsSettings[index].pData==0)
+  		printf("\r\nWrite to Flash..");
+  	else
+  		printf("\r\nRead from Flash..");
+  	break;
+
+  default:
+  	trap_error("Invalid index");
+  	break;
+	}	// Index
+}
+
 /*!
  * @brief Main function
  */
@@ -699,18 +926,8 @@ int main(void)
 		  	else
 		  	switch(result = parseInStr(gsSettings, inStr, outStr, &index) )
 		  	{
-				case PARSE_ASSIGN:
-					if(strcmp(gsSettings[index].pToken,"OPE")==0 && *gsSettings[index].pData == 0)
-					{
-						// Ope=0 init
-						if( initSequence(&door_length) )
-							printf("\r\nInit complete, range: %ld counts", door_length);
-						else
-							printf("\r\nInit Sequence Failed!");
-
-					}
-					else
-						printf(" OK\r\n");
+				case PARSE_ASSIGN:	// The setting gsSettings[index] has been assigned successfully
+					executeCommand(index);
 					break;
 				case PARSE_READ:
 					printf(" %s\r\n",outStr);
