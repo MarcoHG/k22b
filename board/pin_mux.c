@@ -19,6 +19,7 @@ board: FRDM-K22F
 
 #include "fsl_common.h"
 #include "fsl_port.h"
+#include "fsl_gpio.h"
 #include "pin_mux.h"
 
 /* FUNCTION ************************************************************************************************************
@@ -45,6 +46,8 @@ BOARD_InitPins:
   - {pin_num: '41', peripheral: FTM2, signal: 'QD_PH, A', pin_signal: PTB18/FTM2_CH0/I2S0_TX_BCLK/FB_AD15/FTM2_QD_PHA}
   - {pin_num: '42', peripheral: FTM2, signal: 'QD_PH, B', pin_signal: PTB19/FTM2_CH1/I2S0_TX_FS/FB_OE_b/FTM2_QD_PHB}
   - {pin_num: '62', peripheral: GPIOD, signal: 'GPIO, 5', pin_signal: ADC0_SE6b/PTD5/SPI0_PCS2/UART0_CTS_b/FTM0_CH5/FB_AD1/EWM_OUT_b/SPI1_SCK, identifier: ''}
+  - {pin_num: '44', peripheral: GPIOC, signal: 'GPIO, 1', pin_signal: ADC0_SE15/PTC1/LLWU_P6/SPI0_PCS3/UART1_RTS_b/FTM0_CH0/FB_AD13/I2S0_TXD0/LPUART0_RTS_b, direction: INPUT,
+    pull_select: up, pull_enable: enable}
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS ***********
  */
 /* clang-format on */
@@ -61,10 +64,19 @@ void BOARD_InitPins(void)
     CLOCK_EnableClock(kCLOCK_PortA);
     /* Port B Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortB);
+    /* Port C Clock Gate Control: Clock enabled */
+    CLOCK_EnableClock(kCLOCK_PortC);
     /* Port D Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortD);
     /* Port E Clock Gate Control: Clock enabled */
     CLOCK_EnableClock(kCLOCK_PortE);
+
+    gpio_pin_config_t SW2_config = {
+        .pinDirection = kGPIO_DigitalInput,
+        .outputLogic = 0U
+    };
+    /* Initialize GPIO functionality on pin PTC1 (pin 44)  */
+    GPIO_PinInit(BOARD_INITPINS_SW2_GPIO, BOARD_INITPINS_SW2_PIN, &SW2_config);
 
     /* PORTA1 (pin 23) is configured as UART0_RX */
     PORT_SetPinMux(BOARD_INITPINS_LEDRGB_RED_PORT, BOARD_INITPINS_LEDRGB_RED_PIN, kPORT_MuxAlt2);
@@ -77,6 +89,17 @@ void BOARD_InitPins(void)
 
     /* PORTB19 (pin 42) is configured as FTM2_QD_PHB */
     PORT_SetPinMux(PORTB, 19U, kPORT_MuxAlt6);
+
+    /* PORTC1 (pin 44) is configured as PTC1 */
+    PORT_SetPinMux(BOARD_INITPINS_SW2_PORT, BOARD_INITPINS_SW2_PIN, kPORT_MuxAsGpio);
+
+    PORTC->PCR[1] = ((PORTC->PCR[1] &
+                      /* Mask bits to zero which are setting */
+                      (~(PORT_PCR_PS_MASK | PORT_PCR_PE_MASK | PORT_PCR_ISF_MASK)))
+
+                     /* Pull Select: Internal pullup resistor is enabled on the corresponding pin, if the
+                      * corresponding PE field is set. */
+                     | (uint32_t)(kPORT_PullUp));
 
     /* PORTD5 (pin 62) is configured as PTD5 */
     PORT_SetPinMux(PORTD, 5U, kPORT_MuxAsGpio);

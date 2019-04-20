@@ -58,7 +58,7 @@ parse_result_t parseInStr(inputSet_t *pSets, char *inStr, char *outStr, uint8_t 
 	}
 
 	// Look for a match on the gSetting list
-	for(i=0; i< nbr_settings; ++i)
+	for(i=0; i< gNbrUsrInput; ++i)
 	if(strcmp(tokenStr, pSets[i].pToken)==0)	// look for a match using token as the key in the list
 	{
 	  if(bAssign)
@@ -75,7 +75,7 @@ parse_result_t parseInStr(inputSet_t *pSets, char *inStr, char *outStr, uint8_t 
 
 	  }
 	  else
-	  if(i < (nbr_settings + NBR_R_SETTINGS) )
+	  if(i < (gNbrUsrInput + NBR_R_SETTINGS) )
 	  {
 	  	sprintf(outStr,"%d",*pSets[i].pData);
 	  	result = PARSE_READ;
@@ -88,7 +88,7 @@ parse_result_t parseInStr(inputSet_t *pSets, char *inStr, char *outStr, uint8_t 
 	  break;	// we are done
 	}
 		// Return "Token not found"
-	if(i == nbr_settings)
+	if(i == gNbrUsrInput)
 		result = PARSE_UNKOWN_TOKEN;
 	return result;
 }

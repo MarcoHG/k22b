@@ -12,6 +12,8 @@
 #include <string.h>
 #include "settings.h"
 #include "version.h"
+#include "pflash.h"		// imported from pflash example
+#include "fsl_crc.h"	// Added crc support
 
 
 /*******************************************************************************
@@ -27,8 +29,12 @@
 #define QUAD_MODULO					5000	// From component 0..QUAD_MODULO
 #define AMPLIFIER_TIME_OUT  5000
 
+#define	TOK_SAVE	"SAVE"
+#define	TOK_LIST	"LIST"
+
+
 #define NOT_MOVING_POS	5				// Counts to declare 'not moving'
-typedef struct _stTransferUart
+typedef struct transfer_uart
 {
 uart_handle_t handle;
 uart_config_t config;
@@ -67,6 +73,9 @@ void initUarts(void);
 
 bool  buildStdInArg(uint8_t ch, char *str);
 void 	parseAndSendHex(char *cmd);
+void 	defaultValues(void);
+
+void delay_ms(uint32_t delay);
 /*******************************************************************************
  * Variables
  ******************************************************************************/
@@ -78,34 +87,49 @@ volatile int32_t encoder_count = 0U;
 volatile bool req_reset_encoder = false;
 volatile int32_t	gDoor_length =0;
 
+// commands
+int32_t 	gMode;
+int32_t 	gOperation;
+int32_t		dummy;
+
+CRC_Type 			*crc_base = CRC0;
+crc_config_t 	crc_config;
 
 
-inputSet_t 	gsSettings[] =
+inputSet_t 	gUsrInput[] =
 {
-				// Read and write parameters
-/* 0  */	{ "CHKS",     0,	127,		&gSets.checkSpeed     },	// 0 to 127
-/* 1  */	{ "CLOSES",   0,	127,    &gSets.closingSpeed   },	// 0 to 127
-/* 2  */	{ "APERTS",   0,	127,    &gSets.apertureSpeed  },	// 0 to 127
-/* 3  */	{ "WAITO",    0,	40000U, &gSets.waitAtOpenMsec },	// 5 to 40,000
-/* 4  */	{ "CHKP",  		5,	80,     &gSets.checkPercent   },	// 5 to 80
-/* 5  */	{ "PARTOP", 	5,	50,     &gSets.partialPercent },	// 5 to 50
-/* 6  */	{ "CLIM", 		0,	127,    &gSets.currentLimit		},	// 0 to 127
-/* 7  */	{ "RLIM", 		0,	127,    &gSets.regenLimit			},	// 0 to 127
-/* 8  */	{ "ACEL", 		0,	127,    &gSets.acel						},	// 0 to 127
-/* 9  */	{ "DECEL", 		0,	127,    &gSets.decel					},	// 0 to 127
-/* 10 */	{ "CHKDIR",   0,	1,   	  &gSets.checkSpeedDir  },	// 0 to 1
-/* 11 */	{ "SET1",   	0,	1,   	  &gSets.set1  					},	// 0 to 1
-/* 12 */	{ "SET2",   	0,	1,   	  &gSets.set2  					},	// 0 to 1
+				// Read and write parameters - mapped to gData
+/* 0  */	{ "CHKS",     0,	127,		&gData.checkSpeed     },	// 0 to 127
+/* 1  */	{ "CLOSES",   0,	127,    &gData.closingSpeed   },	// 0 to 127
+/* 2  */	{ "APERTS",   0,	127,    &gData.apertureSpeed  },	// 0 to 127
+/* 3  */	{ "WAITO",    0,	40000U, &gData.waitAtOpenMsec },	// 5 to 40,000
+/* 4  */	{ "CHKP",  		5,	80,     &gData.checkPercent   },	// 5 to 80
+/* 5  */	{ "PARTOP", 	5,	50,     &gData.partialPercent },	// 5 to 50
+/* 6  */	{ "CLIM", 		0,	127,    &gData.currentLimit		},	// 0 to 127
+/* 7  */	{ "RLIM", 		0,	127,    &gData.regenLimit			},	// 0 to 127
+/* 8  */	{ "ACEL", 		0,	127,    &gData.acel						},	// 0 to 127
+/* 9  */	{ "DECEL", 		0,	127,    &gData.decel					},	// 0 to 127
+/* 10 */	{ "CHKDIR",   0,	1,   	  &gData.checkSpeedDir  },	// 0 to 1
+/* 11 */	{ "SET1",   	0,	1,   	  &gData.set1  					},	// 0 to 1
+/* 12 */	{ "SET2",   	0,	1,   	  &gData.set2  					},	// 0 to 1
 
-/* 13 */	{ "MODE",			0,	2,		  &gSets.mode           }, 	//  07 Mode 0: run,	1:manual, 2:amplifier
-/* 14 */	{ "OPE",			0,	2,		  &gSets.operation      }, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
-/* 15 */	{ "FLASH",		0,	2,		  &gSets.flash     			}, 	//  08 flash Operation 0: write,	1:Read
+/* 13 */	{ "MODE",			0,	2,		  &gMode           			}, 	//  07 Mode 0: run,	1:manual, 2:amplifier
+/* 14 */	{ "OPE",			0,	2,		  &gOperation      			}, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
+/* 15 */	{ "RANGE",		0,	50000U,	&gDoor_length    			}, 	//  Read Only - set at runtime
+
+
+// These are operations only
+/* 15 */	{ TOK_SAVE,		0,	0,		  &dummy     						}, 	//  Save tp pflash
+/* 16 */	{ TOK_LIST,		0,	0,		  &dummy     						}, 	//  List commands
 		// Read Only settings
 
 };
 
-uint16_t	nbr_settings = sizeof(gsSettings)/sizeof(inputSet_t);	// Variable dimension
-stSettings gSets;
+uint16_t	gNbrUsrInput = sizeof(gUsrInput)/sizeof(inputSet_t);	// Variable dimension
+stPrmData gData;
+uint16_t	gNbrData 			= sizeof(gData)/sizeof(uint32_t);		// Variable dimension	gData gNbrData
+
+
 
 
 
@@ -117,6 +141,42 @@ void trap_error(char *pMsg)
 	volatile char *pDebug = pMsg;	// Debug point
 	while(1);
 }
+
+/* Init CRC-16-CCIT
+  *
+  * @details Init CRC peripheral module for CRC-16/CCIT-FALSE protocol:
+  * 		width=16 poly=0x1021 init=0xffff refin=false refout=false xorout=0x0000 check=0x29b1
+  *    	http://reveng.sourceforge.net/crc-catalogue/
+  *    	name="CRC-16/CCITT-FALSE"
+  */
+
+void crc_init(void)
+{
+	/*
+	 * config.polynomial = 0x1021;
+	 * config.seed = 0xFFFF;
+	 * config.reflectIn = false;
+	 * config.reflectOut = false;
+	 * config.complementChecksum = false;
+	 * config.crcBits = kCrcBits16;
+	 * config.crcResult = kCrcFinalChecksum;
+	 */
+	CRC_GetDefaultConfig(&crc_config);
+	crc_config.seed = 0xFFFFU;
+}
+/*!
+ * @brief Calculate the 16-bit crc
+ *
+ * must initialize the base
+ *
+ */
+uint16_t get_crc(uint8_t *data, uint16_t length)
+{
+	CRC_Init(crc_base, &crc_config);
+  CRC_WriteData(crc_base, data, length);
+  return CRC_Get16bitResult(crc_base);
+}
+
 /* PIT IRQ */
 void PIT1_0_IRQHANDLER (void )
 {
@@ -383,6 +443,10 @@ void initHardware(void)
   gpio_pin_config_t led_config = {
       kGPIO_DigitalOutput, 0,
   };
+  gpio_pin_config_t sw_config = {
+  		kGPIO_DigitalInput,
+    };
+
 	BOARD_InitPins();
 	BOARD_BootClockRUN();
 
@@ -449,22 +513,61 @@ void initHardware(void)
 	// volatile UART_Type *base = UART0;
 	// base->C2 |= UART_C2_TCIE_MASK;	// need to add the status kStatus_UART_TxBusy
 
-
-
   /* Init output LED GPIO. */
   GPIO_PinInit(BOARD_LED_BLUE_GPIO, BOARD_LED_BLUE_GPIO_PIN, &led_config);
+  GPIO_PortSet(BOARD_LED_BLUE_GPIO, 1U << BOARD_LED_BLUE_GPIO_PIN);	// Turn LED off
+
+  /* Init SW2	- also arduino A2*/
+  GPIO_PinInit(BOARD_SW2_GPIO, BOARD_SW2_GPIO_PIN, &sw_config);	// enable pin also in pins.h
+
+  // Init CRC polynomial
+  crc_init();
+
+  // Get data from Memory
+  // test my crc
+  //char testData[] = "123456789";
+  //volatile uint16_t ccrc = get_crc((uint8_t *)&testData, sizeof(testData) - 1);	// 0x29b1
+  //ccrc = get_crc((uint8_t *)&testData, sizeof(testData) - 1);	// 0x29b1
+
+  delay_ms(50);
+  if( !pflash_read((uint32_t *)&gData, gNbrData) )
+ 		printf("\r\nError Reading pflash!\r\n");
+  else
+  {
+  	// Calculate CRC
+  	uint32_t crc 	= get_crc((uint8_t *)&gData, (gNbrData-1)*4);	// AL in 32 bits
+  	if(crc != gData.crc)
+  	{
+  		// Memory corrupted, loading defaults
+  		defaultValues();
+  		printf("\r\nMemory BAD, using defaults\r\n");
+
+  	}
+  	else
+  		printf("\n\rData from pFlash\r\n");
+  	delay_ms(50);
+  }
+  volatile int a= 1234;	// debug
+
 
 }
 
-void initValues(void)
+void defaultValues(void)
 {
-	gSets.currentLimit 	= 20;		//
-	gSets.acel					= 20;
-	gSets.decel					= 20;
-	gSets.checkSpeed		= 40;
-	gSets.apertureSpeed	=	80;
-	gSets.closingSpeed 	= 65;
-	gSets.checkPercent  = 50;
+	gData.checkSpeed		  = 40;
+	gData.closingSpeed 	  = 65;
+	gData.apertureSpeed	  =	80;
+	gData.waitAtOpenMsec	= 2000;
+	gData.checkPercent  	= 50;
+	gData.partialPercent  = 50;
+	gData.currentLimit 	  = 20;		//
+	gData.regenLimit 		  = 20;		//
+	gData.acel					  = 20;
+	gData.decel					  = 20;
+	gData.checkSpeedDir	  = 1;
+	gData.set1 					  = 0;		//
+	gData.set2 					  = 0;		//
+
 }
 
 /*!
@@ -560,7 +663,7 @@ int32_t	absVal(int32_t v)
 bool closeSequence(void)
 {
 	// Set Speed
-	if( !sendAuxSetCommand(0x80, gSets.closingSpeed))
+	if( !sendAuxSetCommand(0x80, gData.closingSpeed))
 		return false;
 
 	// Monitor Zero speed
@@ -574,9 +677,9 @@ bool closeSequence(void)
 	if( !sendAuxSetCommand(0x8A, 0x02))
 		return false;
 	bool moving = true;
-	int32_t closeSpdPos = gDoor_length * gSets.checkPercent/100;
+	int32_t closeSpdPos = gDoor_length * gData.checkPercent/100;
 	bool atCheckSpeed = false;
-	printf("\r\nClosing Doors..%ld, %ld@%ld->0\r\n", gSets.closingSpeed, gSets.checkSpeed, closeSpdPos);
+	printf("\r\nClosing Doors..%ld, %ld@%ld->0\r\n", gData.closingSpeed, gData.checkSpeed, closeSpdPos);
 	while(moving)
 	{
 		static uint16_t counts=0;
@@ -597,7 +700,7 @@ bool closeSequence(void)
 				if(encoder_count < closeSpdPos && !atCheckSpeed)
 				{
 					atCheckSpeed = true;
-					sendAuxSetCommand(0x80, gSets.checkSpeed);
+					sendAuxSetCommand(0x80, gData.checkSpeed);
 
 				}
 				char speed = atCheckSpeed ? 'C' : 'O';
@@ -626,7 +729,7 @@ bool closeSequence(void)
 bool openSequence(void)
 {
 	// Set Speed
-	if( !sendAuxSetCommand(0x80, gSets.apertureSpeed))
+	if( !sendAuxSetCommand(0x80, gData.apertureSpeed))
 		return false;
 
 	// Monitor Zero speed
@@ -640,9 +743,9 @@ bool openSequence(void)
 	if( !sendAuxSetCommand(0x8A, 0x01))
 		return false;
 	bool moving = true;
-	int32_t openSpdPos = gDoor_length * gSets.checkPercent/100;
+	int32_t openSpdPos = gDoor_length * gData.checkPercent/100;
 	bool atCheckSpeed = false;
-	printf("\r\nOpenning Doors..%ld, %ld@%ld->%ld\r\n", gSets.apertureSpeed, gSets.checkSpeed, openSpdPos,gDoor_length );
+	printf("\r\nOpenning Doors..%ld, %ld@%ld->%ld\r\n", gData.apertureSpeed, gData.checkSpeed, openSpdPos,gDoor_length );
 	while(moving)
 	{
 		static uint16_t counts=0;
@@ -663,7 +766,7 @@ bool openSequence(void)
 				if(encoder_count > openSpdPos && !atCheckSpeed)
 				{
 					atCheckSpeed = true;
-					sendAuxSetCommand(0x80, gSets.checkSpeed);
+					sendAuxSetCommand(0x80, gData.checkSpeed);
 
 				}
 				char speed = atCheckSpeed ? 'C' : 'O';
@@ -694,13 +797,13 @@ bool initSequence(int32_t *position_range)
 	if( !sendAuxCommand(0xE1))
 		return false;
 	// Set Current Limit
-	if(!sendAuxSetCommand(0x82, gSets.currentLimit))		// TBD
+	if(!sendAuxSetCommand(0x82, gData.currentLimit))		// TBD
 		return false;
 	// Set Acel
-	if( !sendAuxSetCommand(0x84, gSets.acel) )		// gSets.acel, gSets.decel
+	if( !sendAuxSetCommand(0x84, gData.acel) )		// gData.acel, gData.decel
 		return false;
 	// Set Decel
-	if( !sendAuxSetCommand(0x85, gSets.decel) )
+	if( !sendAuxSetCommand(0x85, gData.decel) )
 		return false;
 	// Set STOP
 	if( !sendAuxSetCommand(0x8A, 0x00) )
@@ -709,11 +812,11 @@ bool initSequence(int32_t *position_range)
 	// Prepare position
 	int32_t position 			= 0;
 	int32_t position_old 	= 0;
-	int32_t position_at_open, position_at_close;
+	int32_t position_at_close;
 	req_reset_encoder = true;	// reset the position
 
 	// Set Speed
-	if( !sendAuxSetCommand(0x80, gSets.checkSpeed))
+	if( !sendAuxSetCommand(0x80, gData.checkSpeed))
 		return false;
 
 	// Monitor POsition
@@ -768,7 +871,6 @@ bool initSequence(int32_t *position_range)
 			zeroSpeed = 0;
 			if(motorDirection == OPEN)
 			{
-				position_at_open = position;
 				req_reset_encoder = true;
 				// delay_ms(10);
 			}
@@ -794,7 +896,7 @@ bool initSequence(int32_t *position_range)
 /*!
  *	@brief	Execute the indicated command
  *
- *	User has input a value to the gsSettings[index] and this function performs
+ *	User has input a value to the gUsrInput[index] and this function performs
  *	the desired operation
  *
  */
@@ -815,10 +917,10 @@ void executeCommand(index)
   case 10: //	 "CHKDIR"
   case 11: //	 spare1
   case 12: //	 spare2
-  	printf(" [%ld]",*gsSettings[index].pData);
+  	printf(" [%ld]",*gUsrInput[index].pData);
   	break;
   case 13: //	 "MODE"
-  	switch(*gsSettings[index].pData)
+  	switch(*gUsrInput[index].pData)
   	{
   	case	0:
   		printf("\r\nRun mode\r\n");
@@ -832,7 +934,7 @@ void executeCommand(index)
   	}
   	break;
   case 14: //	 "OPE"
-  	switch(*gsSettings[index].pData)	//
+  	switch(*gUsrInput[index].pData)	//
   	{
   	case	0:	// OPE=0 to HOME
   		if( initSequence(&gDoor_length) )
@@ -861,12 +963,7 @@ void executeCommand(index)
   		break;
   	}
   	break;
-  case 15:	// Flash operation
-  	if(*gsSettings[index].pData==0)
-  		printf("\r\nWrite to Flash..");
-  	else
-  		printf("\r\nRead from Flash..");
-  	break;
+
 
   default:
   	trap_error("Invalid index");
@@ -888,15 +985,15 @@ int main(void)
 	uint8_t cmd_index=0;
 
 	initHardware();
-	initValues();
 	char inStr[50]={0}, outStr[50]={0};
 
 	parse_result_t result;
 
 	// Start with RUN mode
-	gSets.mode = MODE_RUN;
+	gMode = MODE_RUN;
 	uint8_t index;
 	getRxRingBuffer(&sDbgUartTransfer, &ch); // test
+	bool init_sequence_done = false;
 	while (1)
 	{
 		// GPIO_PortToggle(BOARD_LED_BLUE_GPIO, 1u << BOARD_LED_BLUE_GPIO_PIN);
@@ -904,7 +1001,7 @@ int main(void)
 		// Handle Debug Console
 		if(getRxRingBuffer(&sDbgUartTransfer, &ch))
 		{
-		  if(ch == '`' && gSets.mode == MODE_AMPLIFIER)
+		  if(ch == '`' && gMode == MODE_AMPLIFIER)
 		  {
 		  	//counts = FTM_GetQuadDecoderCounterValue(QUAD1_PERIPHERAL);	// encoder_count = FTM_GetQuadDecoderCounterValue(DEMO_FTM_BASEADDR);
 		  	printf("E: %ld\r\n", encoder_count);
@@ -912,25 +1009,46 @@ int main(void)
 		  else
 		  if (buildStdInArg(ch, inStr) )
 		  {
-		  	if(gSets.mode == MODE_AMPLIFIER)
+		  	if(gMode == MODE_AMPLIFIER)
 		  	{
 		  		if(strstr(inStr,"end") != NULL)
 		  		{
 		  			printf("Mode set to MANUAL\r\n");
-		  			gSets.mode=MODE_MANUAL;
+		  			gMode=MODE_MANUAL;
 		  		}
 		  		else
 		  			parseAndSendHex(inStr);
 
 		  	}
 		  	else
-		  	switch(result = parseInStr(gsSettings, inStr, outStr, &index) )
+		  	switch(result = parseInStr(gUsrInput, inStr, outStr, &index) )
 		  	{
-				case PARSE_ASSIGN:	// The setting gsSettings[index] has been assigned successfully
+				case PARSE_ASSIGN:	// The setting gUsrInput[index] has been assigned successfully
 					executeCommand(index);
 					break;
 				case PARSE_READ:
-					printf(" %s\r\n",outStr);
+					if(!strcmp(gUsrInput[index].pToken, TOK_SAVE) )
+					{
+						gData.crc = get_crc((uint8_t *)&gData, sizeof(gData)-4);
+						if( pflash_write((uint32_t *)&gData, gNbrData) )	// gData
+							printf("\r\nSettings saved...");
+						else
+							printf("\r\nERROR saving parameters ");
+					}
+					else
+					if(!strcmp(gUsrInput[index].pToken, TOK_LIST))
+					{
+						//sDbgUartTransfer.txOnGoing = false;
+						for(int i=0; i<gNbrData-1; ++i)	// don't display last (CRC)
+						{
+							while(sDbgUartTransfer.txOnGoing);	// wait before sending
+							printf("\r\n%02d\t%s\t%ld",i,gUsrInput[i].pToken, *gUsrInput[i].pData );
+						}
+						while(sDbgUartTransfer.txOnGoing);	// wait before sending
+						printf("\r\n");
+					}
+					else
+						printf(" %s\r\n",outStr);
 					break;
 				case PARSE_LIM_ERR:
 					printf("Value not in range\r\n");
@@ -963,11 +1081,28 @@ int main(void)
 
 		}
 
-		// Simulate a long delay
-		//for (uint16_t i = 0; i < 65000U; ++i)
+		// SW2 has been pressed
+		if(!GPIO_PinRead(BOARD_SW2_GPIO, BOARD_SW2_GPIO_PIN))
 		{
-			// Debug
+			// Debounce
+			delay_ms(10);
+			if( GPIO_PinRead(BOARD_SW2_GPIO, BOARD_SW2_GPIO_PIN) )
+				break;	// Noise
+			if(!init_sequence_done)
+			{
+				//
+				printf("Initialize by SW2 request");
+				initSequence(&gDoor_length);
+				init_sequence_done = true;
+			}
+			else
+			{
+				openSequence();
+				closeSequence();
+			}
+
 		}
+		int a = 123;
 
 	}
 }

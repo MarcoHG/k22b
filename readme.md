@@ -2,6 +2,14 @@
 Develop a project using the SDK components, record insights to share with colleagues and create a framework with at least two serial ports. One of the serial will be used for Debug and shall re-target printf to provide debug trace.
 
 Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can by access using OSDA.
+
+## Arduino shield candidate to ship 0.1.6
+- Change motor wires to match encoder wiring 
+- Added pflash and crc drivers
+- save to flash
+- list
+- SW2 starts a 'init sequence' and after it will do "operate'
+
 ## Completed Open and close sequence at command line 0.1.5
 - Added openSequence and closeSequence
 - Using parameters from the gsSet settings,i.e. can be changed at user's input

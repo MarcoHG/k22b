@@ -112,6 +112,9 @@ Current resistor R5 and R7 from 0.001 Ohm to 0.005
 
 # Wiring
 ------------------------------------------
+Motor Black to Amplifier motor -1
+Motor White to amplifier motor +1
+Encoder increases with positive on Black
 
 ## Arduino J2 Connector
 Pin| Arduino | K22 Port | function

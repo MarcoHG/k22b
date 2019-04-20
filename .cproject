@@ -85,13 +85,13 @@
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.undef.symbol.1264895059" name="Undefined symbols (-U)" superClass="gnu.c.compiler.option.preprocessor.undef.symbol"/>
 								<option id="gnu.c.compiler.option.include.paths.1548117691" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="../drivers"/>
-									<listOptionValue builtIn="false" value="../CMSIS"/>
-									<listOptionValue builtIn="false" value="../device"/>
 									<listOptionValue builtIn="false" value="../component/lists"/>
+									<listOptionValue builtIn="false" value="../drivers"/>
 									<listOptionValue builtIn="false" value="../component/serial_manager"/>
-									<listOptionValue builtIn="false" value="../utilities"/>
+									<listOptionValue builtIn="false" value="../device"/>
+									<listOptionValue builtIn="false" value="../CMSIS"/>
 									<listOptionValue builtIn="false" value="../component/uart"/>
+									<listOptionValue builtIn="false" value="../utilities"/>
 									<listOptionValue builtIn="false" value="../board"/>
 									<listOptionValue builtIn="false" value="../source"/>
 									<listOptionValue builtIn="false" value="../"/>
@@ -132,13 +132,13 @@
 								<option id="com.crt.advproject.gas.arch.537941843" name="Architecture" superClass="com.crt.advproject.gas.arch" value="com.crt.advproject.gas.target.cm4" valueType="enumerated"/>
 								<option id="gnu.both.asm.option.flags.crt.1568583296" name="Assembler flags" superClass="gnu.both.asm.option.flags.crt" value="-c -x assembler-with-cpp -D__REDLIB__" valueType="string"/>
 								<option id="gnu.both.asm.option.include.paths.1838728467" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="../drivers"/>
-									<listOptionValue builtIn="false" value="../CMSIS"/>
-									<listOptionValue builtIn="false" value="../device"/>
 									<listOptionValue builtIn="false" value="../component/lists"/>
+									<listOptionValue builtIn="false" value="../drivers"/>
 									<listOptionValue builtIn="false" value="../component/serial_manager"/>
-									<listOptionValue builtIn="false" value="../utilities"/>
+									<listOptionValue builtIn="false" value="../device"/>
+									<listOptionValue builtIn="false" value="../CMSIS"/>
 									<listOptionValue builtIn="false" value="../component/uart"/>
+									<listOptionValue builtIn="false" value="../utilities"/>
 									<listOptionValue builtIn="false" value="../board"/>
 									<listOptionValue builtIn="false" value="../source"/>
 									<listOptionValue builtIn="false" value="../"/>
@@ -265,14 +265,14 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="CMSIS"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="board"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="component"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="device"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="CMSIS"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="utilities"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="drivers"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="device"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="board"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="source"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="startup"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="utilities"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -360,13 +360,13 @@
 								</option>
 								<option id="gnu.c.compiler.option.preprocessor.undef.symbol.261040710" name="Undefined symbols (-U)" superClass="gnu.c.compiler.option.preprocessor.undef.symbol"/>
 								<option id="gnu.c.compiler.option.include.paths.730402906" name="Include paths (-I)" superClass="gnu.c.compiler.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="../drivers"/>
-									<listOptionValue builtIn="false" value="../CMSIS"/>
-									<listOptionValue builtIn="false" value="../device"/>
 									<listOptionValue builtIn="false" value="../component/lists"/>
+									<listOptionValue builtIn="false" value="../drivers"/>
 									<listOptionValue builtIn="false" value="../component/serial_manager"/>
-									<listOptionValue builtIn="false" value="../utilities"/>
+									<listOptionValue builtIn="false" value="../device"/>
+									<listOptionValue builtIn="false" value="../CMSIS"/>
 									<listOptionValue builtIn="false" value="../component/uart"/>
+									<listOptionValue builtIn="false" value="../utilities"/>
 									<listOptionValue builtIn="false" value="../board"/>
 									<listOptionValue builtIn="false" value="../source"/>
 									<listOptionValue builtIn="false" value="../"/>
@@ -409,13 +409,13 @@
 								<option id="com.crt.advproject.gas.arch.478414853" name="Architecture" superClass="com.crt.advproject.gas.arch" value="com.crt.advproject.gas.target.cm4" valueType="enumerated"/>
 								<option id="gnu.both.asm.option.flags.crt.1050986108" name="Assembler flags" superClass="gnu.both.asm.option.flags.crt" value="-c -x assembler-with-cpp -D__REDLIB__" valueType="string"/>
 								<option id="gnu.both.asm.option.include.paths.963253456" name="Include paths (-I)" superClass="gnu.both.asm.option.include.paths" valueType="includePath">
-									<listOptionValue builtIn="false" value="../drivers"/>
-									<listOptionValue builtIn="false" value="../CMSIS"/>
-									<listOptionValue builtIn="false" value="../device"/>
 									<listOptionValue builtIn="false" value="../component/lists"/>
+									<listOptionValue builtIn="false" value="../drivers"/>
 									<listOptionValue builtIn="false" value="../component/serial_manager"/>
-									<listOptionValue builtIn="false" value="../utilities"/>
+									<listOptionValue builtIn="false" value="../device"/>
+									<listOptionValue builtIn="false" value="../CMSIS"/>
 									<listOptionValue builtIn="false" value="../component/uart"/>
+									<listOptionValue builtIn="false" value="../utilities"/>
 									<listOptionValue builtIn="false" value="../board"/>
 									<listOptionValue builtIn="false" value="../source"/>
 									<listOptionValue builtIn="false" value="../"/>
@@ -542,14 +542,14 @@
 						</toolChain>
 					</folderInfo>
 					<sourceEntries>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="CMSIS"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="board"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="component"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="device"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="CMSIS"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="utilities"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="drivers"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="device"/>
+						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="board"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="source"/>
 						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="startup"/>
-						<entry flags="LOCAL|VALUE_WORKSPACE_PATH" kind="sourcePath" name="utilities"/>
 					</sourceEntries>
 				</configuration>
 			</storageModule>
@@ -662,7 +662,7 @@
 		<sdkName>SDK_2.x_FRDM-K22F</sdkName>
 		<sdkExample>frdmk22f_uart_interrupt_transfer</sdkExample>
 		<sdkVersion>2.5.0</sdkVersion>
-		<sdkComponents>platform.drivers.port.MK22F51212;device.MK22F51212_CMSIS.MK22F51212;platform.Include_common.MK22F51212;platform.Include_core_cm4.MK22F51212;platform.drivers.clock.MK22F51212;platform.drivers.common.MK22F51212;platform.drivers.uart.MK22F51212;utility.debug_console.MK22F51212;component.serial_manager.MK22F51212;component.uart_adapter.MK22F51212;component.serial_manager_uart.MK22F51212;platform.drivers.lpuart.MK22F51212;component.lists.MK22F51212;device.MK22F51212_startup.MK22F51212;platform.drivers.smc.MK22F51212;platform.drivers.gpio.MK22F51212;platform.utilities.assert.MK22F51212;frdmk22f_uart_interrupt_transfer;middleware.baremetal.MK22F51212;platform.drivers.ftm.MK22F51212;platform.drivers.pit.MK22F51212;</sdkComponents>
+		<sdkComponents>platform.drivers.port.MK22F51212;device.MK22F51212_CMSIS.MK22F51212;platform.Include_common.MK22F51212;platform.Include_core_cm4.MK22F51212;platform.drivers.clock.MK22F51212;platform.drivers.common.MK22F51212;platform.drivers.uart.MK22F51212;utility.debug_console.MK22F51212;component.serial_manager.MK22F51212;component.uart_adapter.MK22F51212;component.serial_manager_uart.MK22F51212;platform.drivers.lpuart.MK22F51212;component.lists.MK22F51212;device.MK22F51212_startup.MK22F51212;platform.drivers.smc.MK22F51212;platform.drivers.gpio.MK22F51212;platform.utilities.assert.MK22F51212;frdmk22f_uart_interrupt_transfer;middleware.baremetal.MK22F51212;platform.drivers.ftm.MK22F51212;platform.drivers.pit.MK22F51212;platform.drivers.flash.MK22F51212;platform.drivers.crc.MK22F51212;</sdkComponents>
 		<boardId>frdmk22f</boardId>
 		<package>MK22FN512VLH12</package>
 		<core>cm4</core>

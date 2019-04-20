@@ -46,6 +46,13 @@ void BOARD_InitBootPins(void);
 #define BOARD_INITPINS_LEDRGB_GREEN_PIN 2U     /*!<@brief PORTA pin index: 2 */
                                                /* @} */
 
+/*! @name PORTC1 (number 44), J24[6]/LLWU_P6/ADC0_SE15/PUSH_BUTTON2
+  @{ */
+#define BOARD_INITPINS_SW2_GPIO GPIOC /*!<@brief GPIO device name: GPIOC */
+#define BOARD_INITPINS_SW2_PORT PORTC /*!<@brief PORT device name: PORTC */
+#define BOARD_INITPINS_SW2_PIN 1U     /*!<@brief PORTC pin index: 1 */
+                                      /* @} */
+
 /*!
  * @brief Configures pin routing and optionally pin electrical features.
  *

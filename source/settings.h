@@ -47,7 +47,7 @@ typedef enum ctrl_mode_t	{
 /*!
  * Define the Control's settings
  */
-typedef struct settings
+typedef struct  __attribute__((packed)) parameter_data
 {
   int32_t checkSpeed;
   int32_t closingSpeed;
@@ -61,18 +61,16 @@ typedef struct settings
   int32_t decel;
   int32_t checkSpeedDir;
   // spares
-  int32_t set1;
-  int32_t set2;
-  // commands
-  int32_t mode;
-  int32_t operation;
-  int32_t flash;
-} stSettings;
+  int32_t 	set1;
+  int32_t 	set2;
+  uint32_t	crc;
+
+} stPrmData;
 
 parse_result_t parseInStr(inputSet_t *pSett, char *inStr, char *outStr, uint8_t *pIndex);
 
-extern	stSettings 	gSets;
-extern 	inputSet_t 	gsSettings[];
-extern 	uint16_t 		nbr_settings;
+extern	stPrmData 	gData;
+extern 	inputSet_t 	gUsrInput[];
+extern 	uint16_t 		gNbrUsrInput;
 
 #endif /* INPUTSETTINGS_H_ */
