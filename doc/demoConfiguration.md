@@ -163,11 +163,12 @@ pin | Arduino | K22 Port | function
 10  | A4  |  PTB3  |	SDA EEPROM
 12  | A5  |  PTB2  |	SCL
 
+PTC1	SW2		A2
 PTB17	SW3
-PTC1	SW2
 
-PTA1	RED_LED
-PTA2	GREEN_LED	
+
+PTA1	RED_LED			// UART0_RX to K4-2 
+PTA2	GREEN_LED		// Added P{
 PTD5	BLUE_LED
 
 
