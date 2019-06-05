@@ -28,6 +28,8 @@
 #define PIT_MILLI_SEC				5			// Match the PIT component
 #define QUAD_MODULO					5000	// From component 0..QUAD_MODULO
 #define AMPLIFIER_TIME_OUT  5000
+#define READ_CMD_TIME_OUT  	50
+
 
 #define	TOK_SAVE	"SAVE"
 #define	TOK_LIST	"LIST"
@@ -86,6 +88,7 @@ volatile bool pitIsrFlag = false;
 volatile int32_t encoder_count = 0U;
 volatile bool req_reset_encoder = false;
 volatile int32_t	gDoor_length =0;
+volatile int32_t	gVolt_supply;
 
 // commands
 int32_t 	gMode;
@@ -116,6 +119,8 @@ inputSet_t 	gUsrInput[] =
 /* 13 */	{ "MODE",			0,	2,		  &gMode           			}, 	//  07 Mode 0: run,	1:manual, 2:amplifier
 /* 14 */	{ "OPE",			0,	2,		  &gOperation      			}, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
 /* 15 */	{ "RANGE",		0,	50000U,	&gDoor_length    			}, 	//  Read Only - set at runtime
+/* 16 */	{ "VOLT",		  0,	50000U,	&gVolt_supply    			}, 	//  Read Only - set at runtime
+
 
 
 // These are operations only
@@ -654,7 +659,15 @@ bool sendAuxSetCommand(uint8_t cmd, uint8_t value)
 	command[1] = value;
 	return sendAmpDataWait(command,2);
 }
-
+/*!
+ * Compensate PWM output with supply
+ * Norm = 115VAC
+ */
+bool setSpeed(uint32_t spd)
+{
+	uint32_t	speed = (spd * 160)/gVolt_supply;
+	return sendAuxSetCommand(0x80, speed);
+}
 int32_t	absVal(int32_t v)
 {
 	return v < 0	? -v	: v;
@@ -663,7 +676,7 @@ int32_t	absVal(int32_t v)
 bool closeSequence(void)
 {
 	// Set Speed
-	if( !sendAuxSetCommand(0x80, gData.closingSpeed))
+	if( !setSpeed(gData.closingSpeed))		// 0.1.7
 		return false;
 
 	// Monitor Zero speed
@@ -700,7 +713,7 @@ bool closeSequence(void)
 				if(encoder_count < closeSpdPos && !atCheckSpeed)
 				{
 					atCheckSpeed = true;
-					sendAuxSetCommand(0x80, gData.checkSpeed);
+					setSpeed(gData.checkSpeed);		// 0.1.7
 
 				}
 				char speed = atCheckSpeed ? 'C' : 'O';
@@ -725,11 +738,14 @@ bool closeSequence(void)
 }
 
 
-
+/*!
+ * Open sequence
+ *
+ */
 bool openSequence(void)
 {
 	// Set Speed
-	if( !sendAuxSetCommand(0x80, gData.apertureSpeed))
+	if( !setSpeed(gData.apertureSpeed))		// 0.1.7
 		return false;
 
 	// Monitor Zero speed
@@ -766,7 +782,7 @@ bool openSequence(void)
 				if(encoder_count > openSpdPos && !atCheckSpeed)
 				{
 					atCheckSpeed = true;
-					sendAuxSetCommand(0x80, gData.checkSpeed);
+					setSpeed(gData.checkSpeed);	// 0.1.7
 
 				}
 				char speed = atCheckSpeed ? 'C' : 'O';
@@ -815,8 +831,8 @@ bool initSequence(int32_t *position_range)
 	int32_t position_at_close;
 	req_reset_encoder = true;	// reset the position
 
-	// Set Speed
-	if( !sendAuxSetCommand(0x80, gData.checkSpeed))
+	// Set Speed normalized 0.1.7
+	if( !setSpeed(gData.checkSpeed) )
 		return false;
 
 	// Monitor POsition
@@ -971,6 +987,47 @@ void executeCommand(index)
 	}	// Index
 }
 
+bool readCmd(uint8_t cmd, uint8_t *value)
+{
+	uint8_t	cha;
+	uint16_t timeout =0;
+
+	// Flush receiver buffer
+	while(getRxRingBuffer(&sAuxUartTransfer, &cha));
+
+	sAuxUartTransfer.txTransfer.dataSize = 1;
+	sAuxUartTransfer.txBuffer[0] = cmd;
+
+	sAuxUartTransfer.txOnGoing = true;
+	UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle,
+			&sAuxUartTransfer.txTransfer);
+
+	// Wait for TX to end
+	while(sAuxUartTransfer.txOnGoing);
+	pitIsrFlag = false;
+	while(!getRxRingBuffer(&sAuxUartTransfer, value) && timeout < READ_CMD_TIME_OUT) // wait for amplifier to respond
+	if(pitIsrFlag)
+	{
+		pitIsrFlag = false;
+		timeout += PIT_MILLI_SEC;
+	}
+	if(timeout == READ_CMD_TIME_OUT)
+		return false;
+
+	return true;
+
+}
+/*!
+ * 	gVolt_supply
+ */
+void read_supply(void)
+{
+	uint8_t volt;
+	if( readCmd(0xCC, &volt))
+	{
+		gVolt_supply = (100 * volt)/46;
+	}
+}
 /*!
  * @brief Main function
  */
@@ -994,6 +1051,12 @@ int main(void)
 	uint8_t index;
 	getRxRingBuffer(&sDbgUartTransfer, &ch); // test
 	bool init_sequence_done = false;
+
+	// Quick test 0.1.7
+	gDoor_length = 2000;	// \todo remove on commit
+	gVolt_supply = 160;
+	read_supply();
+	setSpeed(0);
 	while (1)
 	{
 		// GPIO_PortToggle(BOARD_LED_BLUE_GPIO, 1u << BOARD_LED_BLUE_GPIO_PIN);

@@ -3,6 +3,9 @@ Develop a project using the SDK components, record insights to share with collea
 
 Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can by access using OSDA.
 
+## Open Sequence and Ajdusts are operaative 0.1.7
+
+
 ## Arduino shield candidate to ship 0.1.6
 - Change motor wires to match encoder wiring 
 - Added pflash and crc drivers

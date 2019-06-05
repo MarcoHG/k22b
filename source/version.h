@@ -14,7 +14,7 @@
 #define	HW_VERS 	'0'
 #define SW_MAJOR	0
 #define SW_MINOR	1
-#define SW_BUILD	6
+#define SW_BUILD	7
 
 
 
