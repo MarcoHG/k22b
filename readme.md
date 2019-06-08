@@ -3,7 +3,40 @@ Develop a project using the SDK components, record insights to share with collea
 
 Target is the FRDM-K22 board. Initially the debug port will be UART1 as it can by access using OSDA.
 
-## Open Sequence and Ajdusts are operaative 0.1.7
+## Added free-runing demo mode 0.1.8
+Added two parameters:  
+"OCAUTO",  0, 1,      &gData.openCloseAuto 	0:Normal, 1:Auto open-close
+"OCWAIT",  0, 50000U, &gData.waitRepeat	    Wait to re-start open-close sequence
+
+**Open sequence:**
+- opens at aperturespeed
+- when reaches pos > percent*range changes to checkspeed
+
+
+
+## Open Sequence and Ajdusts are operative 0.1.7
+- Normalize speed to input voltage line 160V
+Amplifier sends pwm, which is the Vout / Vin ratio
+This version compensantes changes in Vin to keep Vout proportional to ajusts
+Compensation takes 160V as the reference (i.e. compensation is 1.0) 
+Command [cc] Vin = [CC]x2.2 Volts
+Values for read Volt command gain = 2.2
+---|---|--- 
+VIN	|	CC | dec
+80	|24	|36
+100	|2e	|46
+120	|37	|55
+132	|3C	|60
+140	|40	|64
+160	|49	|73
+180	|52	|82
+settings
+speed		%		comp*	ideal voltage
+check		15	18		24V		note: cmd 80 1B (27) to give 24V
+apert   45	54		75V		(54)
+close		38	46		60V		
+[*] Compensation for Vin =100V
+
 
 
 ## Arduino shield candidate to ship 0.1.6

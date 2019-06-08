@@ -60,9 +60,9 @@ typedef struct  __attribute__((packed)) parameter_data
   int32_t acel;
   int32_t decel;
   int32_t checkSpeedDir;
-  // spares
-  int32_t 	set1;
-  int32_t 	set2;
+
+  int32_t 	openCloseAuto;
+  int32_t 	waitRepeat;
   uint32_t	crc;
 
 } stPrmData;

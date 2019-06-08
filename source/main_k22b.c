@@ -30,6 +30,8 @@
 #define AMPLIFIER_TIME_OUT  5000
 #define READ_CMD_TIME_OUT  	50
 
+#define MAX_SPEED_CMD			127
+#define FULL_OPEN_MARGIN	100		// Counts to stop before hit the open-end
 
 #define	TOK_SAVE	"SAVE"
 #define	TOK_LIST	"LIST"
@@ -85,6 +87,7 @@ stTransferUart sDbgUartTransfer;
 stTransferUart sAuxUartTransfer;
 
 volatile bool pitIsrFlag = false;
+volatile uint32_t	pit_counter =0;
 volatile int32_t encoder_count = 0U;
 volatile bool req_reset_encoder = false;
 volatile int32_t	gDoor_length =0;
@@ -106,15 +109,15 @@ inputSet_t 	gUsrInput[] =
 /* 1  */	{ "CLOSES",   0,	127,    &gData.closingSpeed   },	// 0 to 127
 /* 2  */	{ "APERTS",   0,	127,    &gData.apertureSpeed  },	// 0 to 127
 /* 3  */	{ "WAITO",    0,	40000U, &gData.waitAtOpenMsec },	// 5 to 40,000
-/* 4  */	{ "CHKP",  		5,	80,     &gData.checkPercent   },	// 5 to 80
+/* 4  */	{ "CHKP",  		5,	80,     &gData.checkPercent   },	// 5 to 80 speeds
 /* 5  */	{ "PARTOP", 	5,	50,     &gData.partialPercent },	// 5 to 50
 /* 6  */	{ "CLIM", 		0,	127,    &gData.currentLimit		},	// 0 to 127
 /* 7  */	{ "RLIM", 		0,	127,    &gData.regenLimit			},	// 0 to 127
 /* 8  */	{ "ACEL", 		0,	127,    &gData.acel						},	// 0 to 127
 /* 9  */	{ "DECEL", 		0,	127,    &gData.decel					},	// 0 to 127
 /* 10 */	{ "CHKDIR",   0,	1,   	  &gData.checkSpeedDir  },	// 0 to 1
-/* 11 */	{ "SET1",   	0,	1,   	  &gData.set1  					},	// 0 to 1
-/* 12 */	{ "SET2",   	0,	1,   	  &gData.set2  					},	// 0 to 1
+/* 11 */	{ "OCAUTO",   0,	1,   	  &gData.openCloseAuto	},	// 0 to 1,	0:Normal, 1:Auto open-close
+/* 12 */	{ "OCWAIT",  	0,	50000U, &gData.waitRepeat			},	// 0 to 50,000	Wait to re-start open-close sequence
 
 /* 13 */	{ "MODE",			0,	2,		  &gMode           			}, 	//  07 Mode 0: run,	1:manual, 2:amplifier
 /* 14 */	{ "OPE",			0,	2,		  &gOperation      			}, 	//  08 Manual Operation 0: Init,	1:Open, 2:close
@@ -186,9 +189,9 @@ uint16_t get_crc(uint8_t *data, uint16_t length)
 void PIT1_0_IRQHANDLER (void )
 {
 	/* Clear interrupt flag.*/
-	    PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
-	    pitIsrFlag = true;
-
+	PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
+	pitIsrFlag = true;
+	++pit_counter;
 	static uint32_t previous_count;
 	uint32_t	counts = 0;
 	int32_t	delta_counts = 0;
@@ -570,8 +573,8 @@ void defaultValues(void)
 	gData.acel					  = 20;
 	gData.decel					  = 20;
 	gData.checkSpeedDir	  = 1;
-	gData.set1 					  = 0;		//
-	gData.set2 					  = 0;		//
+	gData.openCloseAuto	  = 0;			//	Normal
+	gData.waitRepeat  	  = 3000;		//
 
 }
 
@@ -666,6 +669,8 @@ bool sendAuxSetCommand(uint8_t cmd, uint8_t value)
 bool setSpeed(uint32_t spd)
 {
 	uint32_t	speed = (spd * 160)/gVolt_supply;
+	if(speed >MAX_SPEED_CMD)
+		speed = MAX_SPEED_CMD;
 	return sendAuxSetCommand(0x80, speed);
 }
 int32_t	absVal(int32_t v)
@@ -761,7 +766,7 @@ bool openSequence(void)
 	bool moving = true;
 	int32_t openSpdPos = gDoor_length * gData.checkPercent/100;
 	bool atCheckSpeed = false;
-	printf("\r\nOpenning Doors..%ld, %ld@%ld->%ld\r\n", gData.apertureSpeed, gData.checkSpeed, openSpdPos,gDoor_length );
+	printf("\r\nOpening Doors..%ld, %ld@%ld->%ld\r\n", gData.apertureSpeed, gData.checkSpeed, openSpdPos,gDoor_length );
 	while(moving)
 	{
 		static uint16_t counts=0;
@@ -774,15 +779,26 @@ bool openSequence(void)
 			if(++counts >=25)	// 125mS
 			{
 				counts =0;
+				// This condition is for jamming 0.1.8+
 				if(absVal(position_old - position) < NOT_MOVING_POS )
 					++zeroSpeed;
 				else
 					zeroSpeed=0;
 				position_old = position;
-				if(encoder_count > openSpdPos && !atCheckSpeed)
+				if(encoder_count > openSpdPos)
+				if(!atCheckSpeed)		// Change speed
 				{
 					atCheckSpeed = true;
 					setSpeed(gData.checkSpeed);	// 0.1.7
+
+				}
+				else
+				{
+					if(encoder_count > (gDoor_length - FULL_OPEN_MARGIN))	// close to hit the end-stop?
+					{
+						setSpeed(0);	// 0.1.7
+						moving = false;
+					}
 
 				}
 				char speed = atCheckSpeed ? 'C' : 'O';
@@ -793,7 +809,7 @@ bool openSequence(void)
 		// Read response from Amplifier
 		if(getRxRingBuffer(&sAuxUartTransfer, &cha))
 			printf(" [%x]",0xFF&cha);
-		if(zeroSpeed >= 40)	// 5 secs
+		if(zeroSpeed >= 40)	// 5 secs - jamming -- stop and re-init
 		{
 			moving = false;
 			zeroSpeed = 0;
@@ -849,7 +865,7 @@ bool initSequence(int32_t *position_range)
 	{
 		// Start moving
 		uint8_t dir;
-		char moving_str[2][10] = {"Openning", "Closing"};
+		char moving_str[2][10] = {"Opening", "Closing"};
 		dir = (motorDirection == OPEN) ?  0x01 : 0x02;
 		if( !sendAuxSetCommand(0x8A, dir) )	// Start moving FWD
 			return false;
@@ -1019,15 +1035,95 @@ bool readCmd(uint8_t cmd, uint8_t *value)
 }
 /*!
  * 	gVolt_supply
+ * 	Reads voltage from amplifier and if response,
+ * 	value is set in parameter
+ *
+ * 	\returns true if amplifier responds correclty
  */
-void read_supply(void)
+bool read_supply( uint32_t *volt_in)
 {
 	uint8_t volt;
+
 	if( readCmd(0xCC, &volt))
 	{
-		gVolt_supply = (100 * volt)/46;
+		*volt_in = (22 * volt)/10;	// Command CC gain is 2.2V per count
+		return true;
 	}
+	return false;
 }
+
+
+void do_open_close_sequence(void)
+{
+	static uint32_t counter=0;
+	printf("\r\n*** Open-Close sequence #%u ***", ++counter);
+	req_reset_encoder = true;
+	while(req_reset_encoder);
+	printf(" home ");
+
+	// Open - close sequence
+	openSequence();
+	// Wait at open position
+	printf("\r\nDelay at open");
+	uint32_t	wait_ticks = gData.waitAtOpenMsec/PIT_MILLI_SEC;
+	uint32_t pit_counter_local;
+	for(pit_counter=0;	pit_counter < wait_ticks;)
+	{
+		if(pit_counter_local != pit_counter)
+		{
+			pit_counter_local = pit_counter;
+			if((pit_counter_local % 100)==99 )
+				printf(".");
+		}
+	}
+	closeSequence();
+	printf(" completed.");
+	delay_ms(100);
+
+}
+
+/*!
+ * 	Test the demo open-close flag
+ */
+bool start_open_close_sequence(uint32_t wait_ms)
+{
+	bool run_open_close = false;
+	if(gData.openCloseAuto)
+	{
+		run_open_close = true;
+	  uint8_t ch;
+	  pit_counter = 0;
+	  uint32_t pit_local =0;
+	  //
+	  while( getRxRingBuffer(&sDbgUartTransfer, &ch) );	// flush serial port
+	  delay_ms(100);
+	  printf("\r\nOpen-Close is set continuous, press 'y' to cancel\n");
+	  delay_ms(100);
+	  // Wait for wait_ms for cancellation
+	  while(pit_counter < (wait_ms/PIT_MILLI_SEC) && run_open_close)
+	  if(getRxRingBuffer(&sDbgUartTransfer, &ch))
+	  {
+	  	if(ch == 'y')
+	  	{
+	  		run_open_close = false;
+	  	}
+	  }
+	  else
+	  {
+	  	if(pit_local != pit_counter)
+	  	{
+	  		pit_local = pit_counter;
+	  		if(!(pit_local%200))	// every sec
+	  			printf("\r%u", pit_local*PIT_MILLI_SEC/1000);
+	  	}
+
+	  }
+	}
+	return run_open_close;
+}
+
+
+
 /*!
  * @brief Main function
  */
@@ -1052,11 +1148,21 @@ int main(void)
 	getRxRingBuffer(&sDbgUartTransfer, &ch); // test
 	bool init_sequence_done = false;
 
+#if 0
 	// Quick test 0.1.7
 	gDoor_length = 2000;	// \todo remove on commit
+	init_sequence_done	= true;
+#endif
+
 	gVolt_supply = 160;
-	read_supply();
+	read_supply(&gVolt_supply);
 	setSpeed(0);
+
+	printf("\r\nVoltage Supply %lu", gVolt_supply);
+	// Test for Open-Close on powerup
+	bool run_open_close_sequence = start_open_close_sequence(5000);	//
+
+
 	while (1)
 	{
 		// GPIO_PortToggle(BOARD_LED_BLUE_GPIO, 1u << BOARD_LED_BLUE_GPIO_PIN);
@@ -1138,11 +1244,7 @@ int main(void)
 			//UART_TransferSendNonBlocking(sAuxUartTransfer.base, &sAuxUartTransfer.handle, &sAuxUartTransfer.txTransfer);
 		}
 
-		if(pitIsrFlag)	// Every 5 mS
-		{
-			pitIsrFlag = false;
 
-		}
 
 		// SW2 has been pressed
 		if(!GPIO_PinRead(BOARD_SW2_GPIO, BOARD_SW2_GPIO_PIN))
@@ -1159,13 +1261,52 @@ int main(void)
 				init_sequence_done = true;
 			}
 			else
-			{
-				openSequence();
-				closeSequence();
-			}
+				do_open_close_sequence();
 
 		}
+		// Open close set by powerup
+		if(run_open_close_sequence)
+		{
+			if(!init_sequence_done)
+			{
+				//
+				printf("Initialize by AUTO flag");
+				initSequence(&gDoor_length);
+				init_sequence_done = true;
+			}
+			else
+			{
+				do_open_close_sequence();
+				printf("\r\nWaiting %lu mS to repeat...",gData.waitRepeat);
+				delay_ms(gData.waitRepeat);
+				while(getRxRingBuffer(&sAuxUartTransfer, &cha));	// flush amplifier serial port garbage
+			}
+
+
+		}
+
 		int a = 123;
+
+		if(pitIsrFlag)	// Every 5 mS
+		{
+			static uint32_t run_counter =0;
+			pitIsrFlag = false;
+
+			// Monitor voltage in RUN mode,
+			if(gMode == MODE_RUN)
+			if(++run_counter > 200)	// every second
+			{
+				if( read_supply(&gVolt_supply) )
+				{
+					// printf("\r\nSupply %u ", gVolt_supply);	// test OK
+				}
+				run_counter =0;
+			}
+
+
+
+
+		}
 
 	}
 }
