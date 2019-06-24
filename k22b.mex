@@ -481,11 +481,13 @@
                         <setting name="timerInitVal" value="0"/>
                         <setting name="ftm_quad_decoder_mode" value="kFTM_QuadPhaseEncode"/>
                         <struct name="ftm_phase_a_params">
-                           <setting name="enablePhaseFilter" value="false"/>
+                           <setting name="enablePhaseFilter" value="true"/>
+                           <setting name="phaseFilterVal" value="16"/>
                            <setting name="phasePolarity" value="kFTM_QuadPhaseNormal"/>
                         </struct>
                         <struct name="ftm_phase_b_params">
-                           <setting name="enablePhaseFilter" value="false"/>
+                           <setting name="enablePhaseFilter" value="true"/>
+                           <setting name="phaseFilterVal" value="16"/>
                            <setting name="phasePolarity" value="kFTM_QuadPhaseNormal"/>
                         </struct>
                      </config_set>

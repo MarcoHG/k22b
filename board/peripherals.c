@@ -186,10 +186,12 @@ instance:
     - timerInitVal: '0'
     - ftm_quad_decoder_mode: 'kFTM_QuadPhaseEncode'
     - ftm_phase_a_params:
-      - enablePhaseFilter: 'false'
+      - enablePhaseFilter: 'true'
+      - phaseFilterVal: '16'
       - phasePolarity: 'kFTM_QuadPhaseNormal'
     - ftm_phase_b_params:
-      - enablePhaseFilter: 'false'
+      - enablePhaseFilter: 'true'
+      - phaseFilterVal: '16'
       - phasePolarity: 'kFTM_QuadPhaseNormal'
  * BE CAREFUL MODIFYING THIS COMMENT - IT IS YAML SETTINGS FOR TOOLS **********/
 /* clang-format on */
@@ -208,12 +210,14 @@ const ftm_config_t QUAD1_config = {
   .useGlobalTimeBase = false
 };
 const ftm_phase_params_t QUAD1_phaseAParams = { 
-  .enablePhaseFilter = false,
+  .enablePhaseFilter = true,
+  .phaseFilterVal = 16,
   .phasePolarity = kFTM_QuadPhaseNormal
 
 };
 const ftm_phase_params_t QUAD1_phaseBParams = { 
-  .enablePhaseFilter = false,
+  .enablePhaseFilter = true,
+  .phaseFilterVal = 16,
   .phasePolarity = kFTM_QuadPhaseNormal
 
 };

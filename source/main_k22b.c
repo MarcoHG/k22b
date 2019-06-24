@@ -31,7 +31,9 @@
 #define READ_CMD_TIME_OUT  	50
 
 #define MAX_SPEED_CMD			127
-#define FULL_OPEN_MARGIN	100		// Counts to stop before hit the open-end
+#define FULL_OPEN_MARGIN	5		// Counts to stop before hit the open-end
+															//	5.1 pulses/cm	v0.1.9
+
 
 #define	TOK_SAVE	"SAVE"
 #define	TOK_LIST	"LIST"
@@ -1057,8 +1059,8 @@ void do_open_close_sequence(void)
 {
 	static uint32_t counter=0;
 	printf("\r\n*** Open-Close sequence #%u ***", ++counter);
-	req_reset_encoder = true;
-	while(req_reset_encoder);
+	// req_reset_encoder = true;	0.1.9 keep original home position
+	// while(req_reset_encoder);
 	printf(" home ");
 
 	// Open - close sequence
